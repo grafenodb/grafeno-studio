@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
-          repository: Seerendo/grafeno
+          repository: grafenodb/grafeno
           path: engine
       - uses: docker/setup-buildx-action@v3
       - name: Build the desktop's .deb and .rpm
@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
-          repository: Seerendo/grafeno
+          repository: grafenodb/grafeno
           path: engine
       - uses: actions/setup-node@v4
         with:

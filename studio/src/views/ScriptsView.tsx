@@ -410,7 +410,7 @@ export function ScriptsView() {
           <button className="ghost" onClick={() => download(`${active.name}.gq`, active.text, "text/plain")} title="Download as a .gq file">
             <Icon name="save" /> Save
           </button>
-          <a className="ghost button" href="https://github.com/Seerendo/grafeno/blob/main/docs/query-language.md" target="_blank" rel="noreferrer">
+          <a className="ghost button" href="https://github.com/grafenodb/grafeno/blob/main/docs/query-language.md" target="_blank" rel="noreferrer">
             Reference
           </a>
         </div>

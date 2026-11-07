@@ -1,6 +1,6 @@
 # Grafeno Studio
 
-The graphical interface for [Grafeno](https://github.com/Seerendo/grafeno),
+The graphical interface for [Grafeno](https://github.com/grafenodb/grafeno),
 the graph database engine. It is installed on its own, as pgAdmin is next to
 PostgreSQL: the engine (`grafeno`) runs as a server without any interface,
 and Grafeno Studio connects to it, on the same machine or another, through

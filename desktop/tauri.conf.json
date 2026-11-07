@@ -45,9 +45,9 @@
     "category": "DeveloperTool",
     "shortDescription": "A graph engine for agent memory and knowledge",
     "longDescription": "Grafeno Desktop is the graphical interface of Grafeno, the graph engine for agent memory and knowledge. It opens database files with the Grafeno engine installed on the computer, and connects to Grafeno servers and clusters, through their HTTP API.",
-    "publisher": "Seerendo",
+    "publisher": "GrafenoDB",
     "copyright": "2026, Seerendo",
-    "homepage": "https://github.com/Seerendo/grafeno",
+    "homepage": "https://github.com/grafenodb/grafeno-studio",
     "fileAssociations": [
       {
         "ext": [

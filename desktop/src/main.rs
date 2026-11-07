@@ -499,14 +499,14 @@ fn on_menu(app: &AppHandle, id: &str) {
         }
         "help:docs" => {
             let _ = app.opener().open_url(
-                "https://github.com/Seerendo/grafeno/blob/main/docs/query-language.md",
+                "https://github.com/grafenodb/grafeno/blob/main/docs/query-language.md",
                 None::<&str>,
             );
         }
         "help:repo" => {
             let _ = app
                 .opener()
-                .open_url("https://github.com/Seerendo/grafeno", None::<&str>);
+                .open_url("https://github.com/grafenodb/grafeno", None::<&str>);
         }
         recent if recent.starts_with("recent:") => {
             let index: usize = recent["recent:".len()..].parse().unwrap_or(usize::MAX);

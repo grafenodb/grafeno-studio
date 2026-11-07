@@ -10,6 +10,8 @@ import {
   forgetServer,
   loadServers,
   memberUrls,
+  clientFor,
+  probe,
   saveServer,
 } from "../api.ts";
 import { type EngineInfo, INSTALL_URL, type RecentDatabase, desktop } from "../desktop.ts";
@@ -47,6 +49,11 @@ export function StartView({
   const [url, setUrl] = useState(saved?.url ?? LOCAL_SERVICE);
   const [token, setToken] = useState(saved?.token ?? "");
   const [remember, setRemember] = useState(saved !== null);
+  // After the address and token are checked: an administrator signs in
+  // (or, on a server with no accounts yet, the first one is made).
+  const [admin, setAdmin] = useState<AdminStep | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
 
   const refresh = () => void desktop.recent().then(setRecent).catch(() => setRecent([]));
   const lookForEngine = () => void desktop.engine().then(setEngine).catch(() => setEngine(null));
@@ -84,11 +91,40 @@ export function StartView({
     }
   };
 
-  const connectTo = (server: { name?: string; url: string; token: string }, keep: boolean) => {
+  // First the address and the token: the engine must answer and accept it.
+  const connectTo = async (server: { name?: string; url: string; token: string }, keep: boolean) => {
     const clean = memberUrls(server.url).join(",");
-    if (keep) setServers(saveServer({ name: server.name?.trim() || clean, url: clean, token: server.token }));
-    onConnect({ url: clean, token: server.token.trim() }, keep);
+    const candidate = { url: clean, token: server.token.trim() };
+    setProblem(null);
+    setChecking(true);
+    try {
+      const { about } = await probe(candidate);
+      if (keep) setServers(saveServer({ name: server.name?.trim() || clean, url: clean, token: server.token }));
+      if (!candidate.token && about.auth.open) {
+        // An open server (no token, no accounts): nothing to sign in to.
+        onConnect(candidate, keep);
+        return;
+      }
+      setAdmin({ connection: candidate, keep, accounts: about.auth.accounts, version: about.version });
+    } catch (failure) {
+      setProblem(describeError(failure));
+    } finally {
+      setChecking(false);
+    }
   };
+
+  if (admin) {
+    return (
+      <div className="connect start">
+        <div className="connect-art" aria-hidden="true" />
+        <AdminSignIn
+          step={admin}
+          onBack={() => setAdmin(null)}
+          onConnect={(connection) => onConnect(connection, admin.keep)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="connect start">
@@ -104,7 +140,7 @@ export function StartView({
             <Icon name="plus" /> New window
           </button>
         </div>
-        {(recoveryError || error) && <div className="error">{recoveryError || error}</div>}
+        {(problem || recoveryError || error) && <div className="error">{problem || recoveryError || error}</div>}
         <div className="start-grid">
           <section className="stack tight">
             <h3>On this computer</h3>
@@ -180,7 +216,7 @@ export function StartView({
               <div className="recent-list">
                 {servers.map((server) => (
                   <div key={server.url} className="recent-item">
-                    <button className="recent-open" disabled={unavailable} onClick={() => connectTo(server, true)} title={server.url}>
+                    <button className="recent-open" disabled={unavailable || checking} onClick={() => void connectTo(server, true)} title={server.url}>
                       <span className="ns-dot" />
                       <span className="recent-text">
                         <strong>{server.name}</strong>
@@ -201,7 +237,7 @@ export function StartView({
               className="stack tight"
               onSubmit={(event) => {
                 event.preventDefault();
-                connectTo({ name, url, token }, remember);
+                void connectTo({ name, url, token }, remember);
               }}
             >
               <label className="field">
@@ -213,20 +249,136 @@ export function StartView({
                 <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://127.0.0.1:7810" required />
               </label>
               <label className="field">
-                Token or key <span className="hint">or sign in after connecting</span>
+                Token or key <span className="hint">grafeno config token, on the server; an administrator signs in next</span>
                 <input value={token} onChange={(e) => setToken(e.target.value)} type="password" autoComplete="off" />
               </label>
               <label className="check small">
                 <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
                 Keep it in the list
               </label>
-              <button type="submit" disabled={unavailable}>
-                <Icon name="link" /> Connect
+              <button type="submit" disabled={unavailable || checking}>
+                <Icon name="link" /> {checking ? "Checking…" : "Connect"}
               </button>
             </form>
           </section>
         </div>
       </div>
     </div>
+  );
+}
+
+interface AdminStep {
+  /** The address and the token, checked. */
+  connection: Connection;
+  keep: boolean;
+  /** Whether the server has accounts (else its first administrator is made). */
+  accounts: boolean;
+  version: string;
+}
+
+/**
+ * The second step of connecting to a server, once its token is checked:
+ * an administrator (a superuser) signs in with a name and a password, and
+ * the window works as that account. A server with no accounts yet gets its
+ * first administrator, made with the token.
+ */
+function AdminSignIn({
+  step,
+  onBack,
+  onConnect,
+}: {
+  step: AdminStep;
+  onBack: () => void;
+  onConnect: (connection: Connection) => void;
+}) {
+  const [name, setName] = useState(step.accounts ? "" : "admin");
+  const [password, setPassword] = useState("");
+  const [again, setAgain] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const create = !step.accounts;
+
+  const submit = async () => {
+    setProblem(null);
+    if (create && password !== again) {
+      setProblem("The passwords differ.");
+      return;
+    }
+    setBusy(true);
+    try {
+      if (create) {
+        await clientFor(step.connection).createAccount({ name: name.trim(), kind: "user", password, superuser: true });
+      }
+      const client = clientFor({ url: step.connection.url, token: "" });
+      const tokens = await client.signIn(name.trim(), password);
+      if (!tokens.account.superuser) {
+        await client.signOut().catch(() => undefined);
+        setProblem(`${tokens.account.name} is not an administrator: sign in with a superuser account.`);
+        return;
+      }
+      onConnect({ url: step.connection.url, token: tokens.access_token, refresh: tokens.refresh_token, user: tokens.account.name });
+    } catch (failure) {
+      setProblem(describeError(failure));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form
+      className="connect-card stack"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submit();
+      }}
+    >
+      <div className="connect-brand">
+        <Logo size={48} />
+        <div>
+          <h1>{create ? "The first administrator" : "Administrator"}</h1>
+          <p className="muted small mono">
+            {step.connection.url} · {step.version} · token accepted
+          </p>
+        </div>
+      </div>
+      <p className="muted small">
+        {create
+          ? "This server has no accounts yet. Make its first administrator (a superuser who signs in with a password); the token stays in the server's settings."
+          : "Sign in as an administrator (a superuser) of this server."}
+      </p>
+      {problem && <div className="error">{problem}</div>}
+      <label className="field">
+        Name
+        <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="username" required autoFocus />
+      </label>
+      <label className="field">
+        Password {create && <span className="hint">12 characters or more</span>}
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={create ? "new-password" : "current-password"} required />
+      </label>
+      {create && (
+        <label className="field">
+          Password again
+          <input type="password" value={again} onChange={(e) => setAgain(e.target.value)} autoComplete="new-password" required />
+        </label>
+      )}
+      <button className="primary" type="submit" disabled={busy}>
+        {busy ? "Signing in…" : create ? "Create and sign in" : "Sign in"}
+      </button>
+      <div className="row">
+        <button type="button" className="ghost" onClick={onBack} disabled={busy}>
+          Back
+        </button>
+        <button
+          type="button"
+          className="ghost"
+          style={{ marginLeft: "auto" }}
+          disabled={busy}
+          title="Work with the token's rights (the server's owner), without an account"
+          onClick={() => onConnect(step.connection)}
+        >
+          Continue with the token only
+        </button>
+      </div>
+    </form>
   );
 }

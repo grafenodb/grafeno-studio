@@ -24,7 +24,7 @@ use serde::Serialize;
 pub const LOCAL_URL: &str = "http://grafeno.local";
 
 /// Where the engine's installers are explained.
-pub const INSTALL_URL: &str = "https://github.com/Seerendo/grafeno/blob/main/docs/install.md";
+pub const INSTALL_URL: &str = "https://github.com/grafenodb/grafeno/blob/main/docs/install.md";
 
 /// How long an engine may take to start serving a file (a large file may
 /// be checked, or its layout upgraded, first).

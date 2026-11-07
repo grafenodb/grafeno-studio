@@ -18,8 +18,13 @@ their HTTP API, as any client does, and is installed apart from the engine
 - **A Grafeno server**: the service installed on this computer (found on
   its default address, `127.0.0.1:7810`), one on another machine, or a
   cluster given by its members (`http://a:7810, http://b:7810`). Servers
-  are kept in a list on the start screen, with a token or key, or signed
-  into after connecting.
+  are kept in a list on the start screen. Connecting takes two steps:
+  first the address and the server's token (`grafeno config token`, on the
+  server), which must be accepted; then an administrator (a superuser)
+  signs in with a name and a password, and the window works as that
+  account. A server with no accounts yet offers to make its first
+  administrator with the token; "Continue with the token only" works with
+  the token's rights, without an account.
 
 Several windows can be open at once (File → New window, Ctrl+Shift+N),
 each with its own file or server. On connecting, the Studio checks the

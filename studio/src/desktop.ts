@@ -26,7 +26,7 @@ export const isDesktop = tauri !== undefined;
 export const LOCAL_URL = "http://grafeno.local";
 
 /** Where the engine's installers are explained. */
-export const INSTALL_URL = "https://github.com/Seerendo/grafeno/blob/main/docs/install.md";
+export const INSTALL_URL = "https://github.com/grafenodb/grafeno/blob/main/docs/install.md";
 
 /** The Grafeno engine installed on this computer. */
 export interface EngineInfo {

@@ -27,7 +27,11 @@ engine's repository (engine phase 15).
   installers.
 - **Connections**: several windows, each with its own connection; saved
   servers; the local service found on its default address; clusters by
-  their members.
+  their members. Connecting checks the server's token first, then an
+  administrator signs in (or the first one is made, on a server with no
+  accounts).
+- **Grafeno's mark**, as the Grafeno site has it, in the Studio and the
+  desktop app's icons.
 - **The Studio**: checks each engine (`connect()`), refuses one with no API
   version in common, hides the views an engine lacks, and backs up through
   `GET /v1/backup`.

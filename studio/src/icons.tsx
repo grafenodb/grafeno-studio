@@ -72,29 +72,20 @@ export function Icon({ name, size = 16, className }: { name: IconName; size?: nu
   );
 }
 
-const BONDS =
-  "M10.46 16.46L10.46 28.89M10.46 16.46L21.23 10.24M10.46 28.89L21.23 35.11M21.23 10.24L32 16.46M21.23 35.11L21.23 47.54M21.23 35.11L32 28.89M21.23 47.54L32 53.76M32 16.46L32 28.89M32 16.46L42.77 10.24M32 28.89L42.77 35.11M32 53.76L42.77 47.54M42.77 10.24L53.54 16.46M42.77 35.11L42.77 47.54M42.77 35.11L53.54 28.89M53.54 16.46L53.54 28.89";
-
-const ATOMS: [number, number][] = [
-  [10.46, 16.46], [10.46, 28.89], [21.23, 10.24], [21.23, 35.11], [21.23, 47.54], [32, 16.46],
-  [32, 53.76], [42.77, 10.24], [42.77, 35.11], [42.77, 47.54], [53.54, 16.46], [53.54, 28.89],
-];
-
-/** Grafeno's mark: three fused carbon rings of a graphene lattice. */
+/**
+ * Grafeno's mark (the one of the Grafeno site): three fused carbon rings at
+ * the center of a graphene lattice, served as `grafeno-mark.svg`.
+ */
 export function Logo({ size = 28 }: { size?: number }) {
   return (
-    <svg className="logo" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
-      <defs>
-        <linearGradient id="logo-bond" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="var(--logo-a)" />
-          <stop offset="1" stopColor="var(--logo-b)" />
-        </linearGradient>
-      </defs>
-      <path d={BONDS} fill="none" stroke="url(#logo-bond)" strokeWidth="4" strokeLinecap="round" />
-      {ATOMS.map(([x, y]) => (
-        <circle key={`${x}-${y}`} cx={x} cy={y} r="4.4" fill="var(--logo-atom)" />
-      ))}
-      <circle cx="32" cy="28.89" r="6" fill="var(--logo-a)" stroke="var(--logo-atom)" strokeWidth="2.2" />
-    </svg>
+    <img
+      className="logo"
+      src={`${import.meta.env.BASE_URL}grafeno-mark.svg`}
+      width={size}
+      height={size}
+      alt=""
+      aria-hidden="true"
+      style={{ borderRadius: Math.round(size * 0.18) }}
+    />
   );
 }

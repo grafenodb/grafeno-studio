@@ -18,8 +18,13 @@ pgAdmin aparte de PostgreSQL). Cada ventana tiene su propia conexión:
 - **Un servidor de Grafeno**: el servicio instalado en este equipo
   (detectado en su dirección por defecto, `127.0.0.1:7810`), uno en otra
   máquina, o un clúster por sus miembros (`http://a:7810, http://b:7810`).
-  Los servidores quedan en una lista en la pantalla de inicio, con un token
-  o una clave, o iniciando sesión después de conectar.
+  Los servidores quedan en una lista en la pantalla de inicio. Conectar
+  tiene dos pasos: primero la dirección y el token del servidor (`grafeno
+  config token`, en el servidor), que debe ser aceptado; después inicia
+  sesión un administrador (un superusuario) con su nombre y contraseña, y
+  la ventana trabaja como esa cuenta. Un servidor sin cuentas ofrece crear
+  su primer administrador con el token; "Continue with the token only"
+  trabaja con los permisos del token, sin cuenta.
 
 Se pueden abrir varias ventanas a la vez (Archivo → Nueva ventana,
 Ctrl+Shift+N), cada una con su archivo o servidor. Al conectar, el Studio

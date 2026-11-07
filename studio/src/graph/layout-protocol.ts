@@ -30,4 +30,10 @@ export interface LayoutPositions {
   positions: Float32Array;
 }
 
-export type LayoutResponse = LayoutPositions;
+export interface LayoutBackend {
+  type: "backend";
+  generation: number;
+  backend: "worker" | "webgpu";
+}
+
+export type LayoutResponse = LayoutPositions | LayoutBackend;

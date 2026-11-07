@@ -94,6 +94,14 @@ ranked by degree, restricted to visible nodes large enough on screen, and
 capped between 120 and 250. Focused, selected and collapsed nodes are placed
 ahead of general candidates.
 
+At 100,000 nodes and above, the layout worker opportunistically uses WebGPU
+compute. It evaluates adjacency springs plus a deterministic sample of
+repulsive pairs in linear work per iteration, using ping-pong position and
+velocity buffers. Positions still return through the renderer's existing
+interface. If WebGPU, an adapter, shader creation or the device is unavailable
+or lost, the worker automatically starts the d3-force fallback from the latest
+positions. This keeps WebKitGTK and older or virtualized GPUs supported.
+
 ```bash
 npm run build
 ```

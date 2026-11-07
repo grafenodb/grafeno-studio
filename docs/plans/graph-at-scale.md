@@ -175,6 +175,18 @@ picture readable.
 
 ### Phase 5 (optional): WebGPU for the layout
 
+Status: implemented (2026-11-07), with live hardware measurements pending.
+At 100,000 nodes the existing layout worker requests a WebGPU adapter and
+runs a WGSL compute layout over ping-pong position and velocity buffers. Each
+node evaluates all adjacency springs and eight deterministic repulsion
+samples, keeping work linear in nodes plus edges rather than quadratic. The
+adjacency graph is packed into CSR arrays in the worker. Drag, pin, reheat and
+device-loss paths preserve the existing protocol; any unavailable API,
+adapter, device or pipeline falls back to d3-force from the latest positions.
+The WebGL2 renderer cannot share WebGPU buffers directly, so positions use the
+same transferable path as phase 2. WebView2 and fallback WebKitGTK runs remain
+to be recorded below.
+
 - Where `navigator.gpu` exists (WebView2 on Windows; Chrome and Edge),
   run the force layout as compute shaders, for 100k+ nodes; elsewhere
   (WebKitGTK on Linux today, older GPUs, virtual machines) fall back to

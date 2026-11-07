@@ -73,8 +73,12 @@ test("worker messages use generations to discard stale position buffers", () => 
     assert.deepEqual(worker.messages.slice(0, 2).map((message) => [message.type, message.generation]), [["setData", 1], ["setData", 2]]);
     worker.onmessage({ data: { type: "positions", generation: 1, positions: new Float32Array([1, 2, 3, 4]) } });
     assert.deepEqual(moved, []);
+    worker.onmessage({ data: { type: "backend", generation: 1, backend: "webgpu" } });
+    assert.deepEqual(modes, ["worker"]);
     worker.onmessage({ data: { type: "positions", generation: 2, positions: new Float32Array([5, 6, 7, 8]) } });
     assert.deepEqual(moved, [[5, 6, 7, 8]]);
+    worker.onmessage({ data: { type: "backend", generation: 2, backend: "webgpu" } });
+    assert.deepEqual(modes, ["worker", "webgpu"]);
     layout.stop();
     assert.equal(worker.messages.at(-1).type, "stop");
     assert.equal(worker.terminated, true);

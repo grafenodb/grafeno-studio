@@ -42,7 +42,7 @@ export function BenchmarkView() {
   const first = useRef(true);
   const [metrics, setMetrics] = useState(initialMetrics);
   const [panning, setPanning] = useState(false);
-  const [layout, setLayout] = useState<"starting" | "worker" | "main">("starting");
+  const [layout, setLayout] = useState<"starting" | "webgpu" | "worker" | "main">("starting");
   const [renderer, setRenderer] = useState<"starting" | "canvas2d" | "webgl2">("starting");
 
   useEffect(() => {

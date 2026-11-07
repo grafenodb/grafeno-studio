@@ -2,7 +2,7 @@ import type { LayoutEdgeInput, LayoutNodeInput, LayoutPoint, LayoutRequest, Layo
 import { LayoutSimulation } from "./layout-simulation.ts";
 
 type Data = { generation: number; nodes: LayoutNodeInput[]; edges: LayoutEdgeInput[]; alpha: number };
-export type LayoutMode = "worker" | "main";
+export type LayoutMode = "webgpu" | "worker" | "main";
 
 /** Runs layout in a module worker, falling back to the main thread if needed. */
 export class GraphLayout {
@@ -25,7 +25,9 @@ export class GraphLayout {
     try {
       const worker = new Worker(new URL("./layout.worker.ts", import.meta.url), { type: "module" });
       worker.onmessage = (event: MessageEvent<LayoutResponse>) => {
-        if (event.data.type === "positions" && event.data.generation === this.generation) this.acceptPositions(event.data.positions);
+        if (event.data.generation !== this.generation) return;
+        if (event.data.type === "positions") this.acceptPositions(event.data.positions);
+        else this.modeChanged(event.data.backend);
       };
       worker.onerror = () => this.startFallback();
       worker.onmessageerror = () => this.startFallback();

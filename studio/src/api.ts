@@ -1,6 +1,6 @@
 // The connection to a Grafeno server, and small helpers shared by the views.
 
-import { Grafeno, GrafenoError, type Node } from "../../client/src/index.ts";
+import { type About, Grafeno, GrafenoError, type Node } from "../../client/src/index.ts";
 import { desktopFetch, isDesktop } from "./desktop.ts";
 
 export type { Edge, NamespaceInfo, Node, NodeWithText, QueryResult } from "../../client/src/index.ts";
@@ -97,17 +97,23 @@ export function clientFor(connection: Connection): Grafeno {
 }
 
 /** Checks that the server answers and accepts the token. */
-export async function probe(connection: Connection): Promise<{ version: string }> {
+/**
+ * Checks a server before using it: what it is and can do (`connect()`,
+ * which refuses an engine speaking no API version of the client), and
+ * that the credentials work.
+ */
+export async function probe(connection: Connection): Promise<{ version: string; about: About }> {
   const client = clientFor(connection);
-  const health = await client.health();
+  const about = await client.connect();
   await client.namespaces();
-  return { version: health.version };
+  return { version: about.version, about };
 }
 
 export function describeError(error: unknown): string {
   if (error instanceof GrafenoError) {
     if (error.status === 401 && (error.code === "session_expired" || error.message.includes("session"))) return "The session ended: sign in again.";
     if (error.status === 401) return error.message || "The server needs a valid token.";
+    if (error.code === "incompatible") return `This Studio cannot work with this engine: ${error.message}.`;
     if (error.status === 0) return `Cannot reach the server: ${error.message}`;
     return error.message;
   }
@@ -141,3 +147,5 @@ export function formatTime(micros: number | null | undefined): string {
 export function go(view: string, param?: string): void {
   window.location.hash = param ? `#/${view}/${encodeURIComponent(param)}` : `#/${view}`;
 }
+
+export type { About };

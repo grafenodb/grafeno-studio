@@ -23,6 +23,8 @@ export interface NewEdgeOptions {
 export interface Studio {
   client: Grafeno;
   connection: Connection;
+  /** Whether the engine can do this (`GET /v1/about`); views and actions it lacks are hidden. */
+  supports: (capability: string) => boolean;
   namespace: string;
   setNamespace: (name: string) => void;
   /** Every namespace, empty ones included. */

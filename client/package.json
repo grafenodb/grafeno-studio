@@ -1,6 +1,6 @@
 {
   "name": "grafeno-client",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A copy of the Grafeno engine's TypeScript client (grafeno/clients/typescript), kept here until it is published",
   "type": "module",
   "exports": {

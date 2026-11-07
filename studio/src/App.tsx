@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
+import { type About,
   type Connection,
   type NamespaceInfo,
   clientFor,
@@ -32,16 +32,17 @@ import { StartView } from "./views/StartView.tsx";
 
 export { useStudio };
 
-const VIEWS: { id: string; title: string; icon: IconName; hint: string }[] = [
+/** The views; `needs` is the engine capability a view uses (hidden without it). */
+const VIEWS: { id: string; title: string; icon: IconName; hint: string; needs?: string }[] = [
   { id: "overview", title: "Overview", icon: "overview", hint: "Namespaces and what they hold" },
   { id: "explorer", title: "Explorer", icon: "explorer", hint: "Browse, create and edit nodes" },
   { id: "graph", title: "Graph", icon: "graph", hint: "Draw and connect the graph" },
   { id: "scripts", title: "Scripts", icon: "scripts", hint: "Write and run GQ scripts" },
   { id: "search", title: "Search", icon: "search", hint: "Full text, recall and context" },
-  { id: "memory", title: "Memory", icon: "memory", hint: "Duplicates, decay, consolidation" },
+  { id: "memory", title: "Memory", icon: "memory", hint: "Duplicates, decay, consolidation", needs: "memory" },
   { id: "admin", title: "Administration", icon: "admin", hint: "Check, rebuild, export, import" },
-  { id: "cluster", title: "Cluster", icon: "cluster", hint: "Members, Raft groups, lag, where namespaces live" },
-  { id: "access", title: "Access", icon: "access", hint: "Users, roles and their privileges" },
+  { id: "cluster", title: "Cluster", icon: "cluster", hint: "Members, Raft groups, lag, where namespaces live", needs: "cluster" },
+  { id: "access", title: "Access", icon: "access", hint: "Users, roles and their privileges", needs: "roles" },
 ];
 
 function parseHash(): { view: string; param?: string } {
@@ -349,13 +350,13 @@ function NewMenu() {
 
 /** Ctrl+K: jump to a view, run an action or open a node. */
 function CommandPalette({ onClose }: { onClose: () => void }) {
-  const { newNode, newEdge, namespaces, setNamespace } = useStudio();
+  const { newNode, newEdge, namespaces, setNamespace, supports } = useStudio();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const { results, searching } = useNodeSearch(query, 6);
   const text = query.trim().toLowerCase();
   const commands = [
-    ...VIEWS.map((view) => ({ key: `v-${view.id}`, icon: view.icon, title: `Go to ${view.title}`, hint: view.hint, run: () => go(view.id) })),
+    ...VIEWS.filter((view) => !view.needs || supports(view.needs)).map((view) => ({ key: `v-${view.id}`, icon: view.icon, title: `Go to ${view.title}`, hint: view.hint, run: () => go(view.id) })),
     { key: "new-node", icon: "node" as IconName, title: "New node", hint: "Create a node", run: () => newNode({ onCreated: (id) => go("explorer", id) }) },
     { key: "new-edge", icon: "link" as IconName, title: "New fact", hint: "Connect two nodes", run: () => newEdge() },
     ...namespaces.map(({ name }) => ({ key: `ns-${name}`, icon: "folder" as IconName, title: `Namespace: ${name}`, hint: "Switch namespace", run: () => setNamespace(name) })),
@@ -430,6 +431,7 @@ interface Toast {
 export function App() {
   const [connection, setConnection] = useState<Connection | null>(null);
   const [version, setVersion] = useState<string>("");
+  const [about, setAbout] = useState<About | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
   const [route, setRoute] = useState(parseHash);
@@ -463,9 +465,10 @@ export function App() {
   const connect = useCallback(async (candidate: Connection, remember?: boolean) => {
     setChecking(true);
     try {
-      const { version } = await probe(candidate);
+      const { version, about } = await probe(candidate);
       if (remember !== undefined) saveConnection(candidate, remember);
       setVersion(version);
+      setAbout(about);
       setConnection(candidate);
       setError(null);
     } catch (problem) {
@@ -680,6 +683,7 @@ export function App() {
   const studio: Studio = {
     client,
     connection,
+    supports: (capability) => about?.capabilities.includes(capability) ?? false,
     namespace: current,
     setNamespace,
     namespaces,
@@ -710,7 +714,7 @@ export function App() {
             </span>
           </a>
           <div className="nav">
-            {VIEWS.map((item) => (
+            {VIEWS.filter((item) => !item.needs || studio.supports(item.needs)).map((item) => (
               <a key={item.id} href={`#/${item.id}`} className={item.id === view ? "nav-item active" : "nav-item"} title={collapsed ? item.title : item.hint}>
                 <Icon name={item.icon} size={18} />
                 <span>{item.title}</span>

@@ -14,7 +14,7 @@ function download(name: string, text: string): void {
 }
 
 export function AdminView() {
-  const { client, connection, namespace, namespaces, setNamespace, changed: refreshNamespaces, confirm, toast } = useStudio();
+  const { client, connection, namespace, namespaces, setNamespace, changed: refreshNamespaces, confirm, toast, supports } = useStudio();
   const info = namespaces.find((item) => item.name === namespace);
   const [check, setCheck] = useState<CheckReport | null>(null);
   const [rebuild, setRebuild] = useState<RebuildReport | null>(null);
@@ -97,7 +97,7 @@ export function AdminView() {
           >
             Export everything
           </button>
-          {(!isDesktop || connection.url.startsWith(`${LOCAL_URL}/session/`)) && (
+          {supports("backup") && (
             <button
               disabled={busy !== null}
               title="A copy of the whole database file (every namespace and the keys), taken while it keeps working. Choose a new file; existing files are preserved. Owners only."
@@ -107,8 +107,11 @@ export function AdminView() {
                   if (isDesktop) {
                     const path = await desktop.pickSave(name, "redb");
                     if (!path) return;
-                    const bytes = await desktop.backupTo(path, connection.url);
-                    toast(`Backup written (${Math.round(bytes / 1024)} KiB).`, "ok");
+                    // Through the API (GET /v1/backup), for a local database
+                    // and a remote server alike; the app only writes the file.
+                    const bytes = await client.backup();
+                    await desktop.writeBytes(path, bytes);
+                    toast(`Backup written (${Math.round(bytes.byteLength / 1024)} KiB).`, "ok");
                     return;
                   }
                   const url = URL.createObjectURL(new Blob([await client.backup()], { type: "application/octet-stream" }));

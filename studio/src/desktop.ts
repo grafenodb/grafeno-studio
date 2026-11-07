@@ -29,6 +29,14 @@ export interface RecentDatabase {
   exists: boolean;
 }
 
+function toBase64(bytes: Uint8Array): string {
+  const chunks: string[] = [];
+  for (let start = 0; start < bytes.length; start += 32768) {
+    chunks.push(String.fromCharCode(...bytes.subarray(start, start + 32768)));
+  }
+  return btoa(chunks.join(""));
+}
+
 function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!tauri) return Promise.reject(new Error("not in the desktop app"));
   return tauri.core.invoke<T>(command, args);
@@ -46,7 +54,7 @@ export const desktop = {
   writeText: (path: string, contents: string) => invoke<void>("write_text", { path, contents }),
   readText: (path: string) => invoke<string>("read_text", { path }),
   openExternal: (url: string) => invoke<void>("open_external", { url }),
-  backupTo: (path: string, sessionUrl: string) => invoke<number>("backup_database", { path, sessionUrl }),
+  writeBytes: (path: string, bytes: ArrayBuffer) => invoke<void>("write_bytes", { path, bytesBase64: toBase64(new Uint8Array(bytes)) }),
   restoreTo: (source: string, path: string) => invoke<number>("restore_database", { source, path }),
   listen: <T>(event: string, handler: (payload: T) => void): (() => void) => {
     let stop: (() => void) | null = null;

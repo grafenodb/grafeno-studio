@@ -23,7 +23,7 @@ mod bridge;
 mod local_database;
 use bridge::{Reply, local_request, remote_request, request_body};
 use local_database::{
-    Session, SessionInfo, backup_target, file_name, info, local_path, open_session, request_target,
+    Session, SessionInfo, file_name, info, local_path, open_session, request_target,
 };
 
 /// Recent databases kept in the menu and on the start screen.
@@ -188,25 +188,20 @@ async fn pick_open(app: AppHandle, extensions: Vec<String>) -> Option<String> {
         .map(|path| path.display().to_string())
 }
 
-/// The backup is of the session chosen before the dialog. It never overwrites.
+/// Writes bytes the Studio got through the API (a backup from
+/// `GET /v1/backup`) to a file the user picked; it never overwrites.
 #[tauri::command]
-async fn backup_database(
-    desktop: State<'_, Desktop>,
-    path: String,
-    session_url: String,
-) -> Result<u64, String> {
-    let db = backup_target(
-        desktop.session.lock().expect("not poisoned").as_ref(),
-        &session_url,
-    )?;
-    tokio::task::spawn_blocking(move || {
-        db.begin_read()
-            .and_then(|read| read.backup(Path::new(&path)))
-            .map(|stats| stats.bytes)
-            .map_err(|error| error.to_string())
-    })
-    .await
-    .map_err(|error| error.to_string())?
+async fn write_bytes(path: String, bytes_base64: String) -> Result<(), String> {
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(bytes_base64)
+        .map_err(|error| error.to_string())?;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .map_err(|error| format!("cannot create {path}: {error}"))?;
+    std::io::Write::write_all(&mut file, &bytes).map_err(|error| format!("cannot write {path}: {error}"))
 }
 
 /// Recovers into a new file without changing the session or the backup.
@@ -470,7 +465,7 @@ fn main() {
             write_text,
             read_text,
             open_external,
-            backup_database,
+            write_bytes,
             restore_database,
             request,
         ])

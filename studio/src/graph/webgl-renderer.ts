@@ -4,6 +4,39 @@ export function usesWebGL(nodeCount: number, available = true): boolean {
   return available && nodeCount > WEBGL_THRESHOLD;
 }
 
+export interface GraphLevelOfDetail {
+  edgeMinimum: number;
+  edgeWidth: number;
+  arrows: boolean;
+  edgeLabels: boolean;
+  minimumLabelPixels: number;
+  maximumLabels: number;
+}
+
+export function graphLevelOfDetail(zoom: number): GraphLevelOfDetail {
+  if (zoom < 0.18) return { edgeMinimum: 0.9, edgeWidth: 0.75, arrows: false, edgeLabels: false, minimumLabelPixels: 9, maximumLabels: 120 };
+  if (zoom < 0.32) return { edgeMinimum: 0.75, edgeWidth: 0.85, arrows: false, edgeLabels: false, minimumLabelPixels: 8, maximumLabels: 160 };
+  if (zoom < 0.55) return { edgeMinimum: 0.45, edgeWidth: 1, arrows: false, edgeLabels: false, minimumLabelPixels: 6, maximumLabels: 220 };
+  return { edgeMinimum: 0, edgeWidth: 1.1, arrows: zoom >= 0.85, edgeLabels: zoom >= 0.85, minimumLabelPixels: 5, maximumLabels: 250 };
+}
+
+/** Scores edges by endpoint degree and deterministically samples ties. */
+export function rankEdgeImportance(scores: ArrayLike<number>): Float32Array {
+  const result = new Float32Array(scores.length);
+  if (scores.length === 0) return result;
+  let minimum = Infinity;
+  let maximum = -Infinity;
+  for (let index = 0; index < scores.length; index++) {
+    minimum = Math.min(minimum, scores[index]);
+    maximum = Math.max(maximum, scores[index]);
+  }
+  for (let index = 0; index < scores.length; index++) {
+    const sample = (Math.imul(index + 1, 0x9e3779b1) >>> 0) / 0xffffffff;
+    result[index] = maximum === minimum ? sample : ((scores[index] - minimum) / (maximum - minimum)) * 0.9 + sample * 0.1;
+  }
+  return result;
+}
+
 export interface RenderNode {
   id: string;
   color: string;
@@ -75,16 +108,23 @@ precision highp float;
 layout(location=0) in float aSource;
 layout(location=1) in float aTarget;
 layout(location=2) in float aPick;
+layout(location=3) in float aImportance;
 uniform sampler2D uPositions;
 uniform int uTextureWidth;
 uniform vec3 uView;
 uniform vec2 uViewport;
 uniform float uWidth;
+uniform float uMinImportance;
 flat out uint vPick;
 vec2 positionAt(int index) {
   return texelFetch(uPositions, ivec2(index % uTextureWidth, index / uTextureWidth), 0).rg;
 }
 void main() {
+  if (aSource == aTarget || aImportance < uMinImportance) {
+    gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
+    vPick = uint(aPick);
+    return;
+  }
   int vertex = gl_VertexID;
   vec2 a = positionAt(int(aSource)) * uView.z + uView.xy;
   vec2 b = positionAt(int(aTarget)) * uView.z + uView.xy;
@@ -93,9 +133,40 @@ void main() {
   vec2 normal = vec2(-direction.y, direction.x) / distance;
   bool atEnd = vertex == 1 || vertex == 3;
   float side = vertex >= 2 ? 1.0 : -1.0;
-  vec2 screen = (atEnd ? b : a) + normal * uWidth * 0.5 * side;
+  float width = uWidth * mix(0.45, 1.0, aImportance);
+  vec2 screen = (atEnd ? b : a) + normal * width * 0.5 * side;
   gl_Position = vec4(screen.x / uViewport.x * 2.0 - 1.0, 1.0 - screen.y / uViewport.y * 2.0, 0.0, 1.0);
   vPick = uint(aPick);
+}`;
+
+const ARROW_VERTEX = `#version 300 es
+precision highp float;
+layout(location=0) in float aSource;
+layout(location=1) in float aTarget;
+layout(location=3) in float aImportance;
+layout(location=4) in float aTargetSize;
+uniform sampler2D uPositions;
+uniform int uTextureWidth;
+uniform vec3 uView;
+uniform vec2 uViewport;
+uniform float uMinImportance;
+uniform float uArrowSize;
+vec2 positionAt(int index) {
+  return texelFetch(uPositions, ivec2(index % uTextureWidth, index / uTextureWidth), 0).rg;
+}
+void main() {
+  if (aSource == aTarget || aImportance < uMinImportance) {
+    gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
+    return;
+  }
+  vec2 a = positionAt(int(aSource)) * uView.z + uView.xy;
+  vec2 b = positionAt(int(aTarget)) * uView.z + uView.xy;
+  vec2 direction = normalize(b - a + vec2(0.0001));
+  vec2 normal = vec2(-direction.y, direction.x);
+  vec2 tip = b - direction * (aTargetSize * uView.z + 2.0);
+  vec2 back = tip - direction * uArrowSize;
+  vec2 screen = gl_VertexID == 0 ? tip : back + normal * uArrowSize * (gl_VertexID == 1 ? 0.55 : -0.55);
+  gl_Position = vec4(screen.x / uViewport.x * 2.0 - 1.0, 1.0 - screen.y / uViewport.y * 2.0, 0.0, 1.0);
 }`;
 
 const EDGE_FRAGMENT = `#version 300 es
@@ -149,6 +220,7 @@ export class WebGLGraphRenderer {
   private readonly gl: WebGL2RenderingContext;
   private readonly nodeProgram: WebGLProgram;
   private readonly edgeProgram: WebGLProgram;
+  private readonly arrowProgram: WebGLProgram;
   private readonly nodePickProgram: WebGLProgram;
   private readonly edgePickProgram: WebGLProgram;
   private readonly nodeBuffer!: WebGLBuffer;
@@ -190,6 +262,7 @@ export class WebGLGraphRenderer {
     this.gl = gl;
     this.nodeProgram = program(gl, NODE_VERTEX, NODE_FRAGMENT);
     this.edgeProgram = program(gl, EDGE_VERTEX, EDGE_FRAGMENT);
+    this.arrowProgram = program(gl, ARROW_VERTEX, EDGE_FRAGMENT);
     this.nodePickProgram = program(gl, NODE_VERTEX, PICK_FRAGMENT);
     this.edgePickProgram = program(gl, EDGE_VERTEX, PICK_FRAGMENT);
     const nodeBuffer = gl.createBuffer();
@@ -216,9 +289,9 @@ export class WebGLGraphRenderer {
 
     gl.bindVertexArray(edgeVao);
     gl.bindBuffer(gl.ARRAY_BUFFER, edgeBuffer);
-    for (let location = 0; location < 3; location++) {
+    for (let location = 0; location < 5; location++) {
       gl.enableVertexAttribArray(location);
-      gl.vertexAttribPointer(location, 1, gl.FLOAT, false, 12, location * 4);
+      gl.vertexAttribPointer(location, 1, gl.FLOAT, false, 20, location * 4);
       gl.vertexAttribDivisor(location, 1);
     }
     gl.bindVertexArray(null);
@@ -265,9 +338,19 @@ export class WebGLGraphRenderer {
     }
     const keptEdges = edges.filter((edge) => indices.has(edge.source.id) && indices.has(edge.target.id));
     this.edgeCount = keptEdges.length;
-    const edgeData = new Float32Array(keptEdges.length * 3);
+    const degree = new Uint32Array(nodes.length);
+    for (const edge of keptEdges) {
+      degree[indices.get(edge.source.id)!]++;
+      degree[indices.get(edge.target.id)!]++;
+    }
+    const scores = new Uint32Array(keptEdges.length);
+    for (let index = 0; index < keptEdges.length; index++) scores[index] = degree[indices.get(keptEdges[index].source.id)!] + degree[indices.get(keptEdges[index].target.id)!];
+    const importance = rankEdgeImportance(scores);
+    const edgeData = new Float32Array(keptEdges.length * 5);
     for (let index = 0; index < keptEdges.length; index++) {
-      edgeData.set([indices.get(keptEdges[index].source.id)!, indices.get(keptEdges[index].target.id)!, index + 1], index * 3);
+      const source = indices.get(keptEdges[index].source.id)!;
+      const target = indices.get(keptEdges[index].target.id)!;
+      edgeData.set([source, target, index + 1, importance[index], keptEdges[index].target.size], index * 5);
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, this.nodeBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, nodeData, gl.STATIC_DRAW);
@@ -302,14 +385,17 @@ export class WebGLGraphRenderer {
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    this.drawEdges(this.edgeProgram, view, 1.1, color(palette.muted, 0.48));
+    const lod = graphLevelOfDetail(view.k);
+    const edgeColor = color(palette.muted, 0.48);
+    this.drawEdges(this.edgeProgram, view, lod.edgeWidth, lod.edgeMinimum, edgeColor);
+    if (lod.arrows) this.drawArrows(view, lod.edgeMinimum, edgeColor);
     this.drawNodes(this.nodeProgram, view, color(palette.panel));
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.pickFramebuffer);
     gl.disable(gl.BLEND);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    this.drawEdges(this.edgePickProgram, view, 7, null);
+    this.drawEdges(this.edgePickProgram, view, 7, lod.edgeMinimum, null);
     this.drawNodes(this.nodePickProgram, view, null);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     this.renderVersion++;
@@ -341,7 +427,7 @@ export class WebGLGraphRenderer {
     gl.deleteTexture(this.positionTexture);
     gl.deleteTexture(this.pickTexture);
     gl.deleteFramebuffer(this.pickFramebuffer);
-    for (const item of [this.nodeProgram, this.edgeProgram, this.nodePickProgram, this.edgePickProgram]) gl.deleteProgram(item);
+    for (const item of [this.nodeProgram, this.edgeProgram, this.arrowProgram, this.nodePickProgram, this.edgePickProgram]) gl.deleteProgram(item);
     this.canvas.remove();
   }
 
@@ -364,12 +450,23 @@ export class WebGLGraphRenderer {
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.nodeCount);
   }
 
-  private drawEdges(program: WebGLProgram, view: { x: number; y: number; k: number }, width: number, edgeColor: [number, number, number, number] | null): void {
+  private drawEdges(program: WebGLProgram, view: { x: number; y: number; k: number }, width: number, minimum: number, edgeColor: [number, number, number, number] | null): void {
     const { gl } = this;
     this.uniforms(program, view);
     gl.uniform1f(gl.getUniformLocation(program, "uWidth"), width);
+    gl.uniform1f(gl.getUniformLocation(program, "uMinImportance"), minimum);
     if (edgeColor) gl.uniform4fv(gl.getUniformLocation(program, "uColor"), edgeColor);
     gl.bindVertexArray(this.edgeVao);
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.edgeCount);
+  }
+
+  private drawArrows(view: { x: number; y: number; k: number }, minimum: number, edgeColor: [number, number, number, number]): void {
+    const { gl } = this;
+    this.uniforms(this.arrowProgram, view);
+    gl.uniform1f(gl.getUniformLocation(this.arrowProgram, "uMinImportance"), minimum);
+    gl.uniform1f(gl.getUniformLocation(this.arrowProgram, "uArrowSize"), 7);
+    gl.uniform4fv(gl.getUniformLocation(this.arrowProgram, "uColor"), edgeColor);
+    gl.bindVertexArray(this.edgeVao);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 3, this.edgeCount);
   }
 }

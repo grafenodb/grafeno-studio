@@ -153,6 +153,16 @@ more on the E1 laptop, with selection and opening working.
 
 ### Phase 4: level of detail
 
+Status: implemented (2026-11-07), with the phase 3 performance run still
+pending. The WebGL renderer ranks edges by the combined degree of their
+endpoints and deterministically orders ties. Four zoom bands progressively
+restore them; arrows and edge labels appear at 0.85×. Node label candidates
+are pre-ranked by degree, filtered by viewport and projected size, and capped
+from 120 to 250 according to zoom. Focused, selected, expanded-root and
+collapsed-community nodes remain eligible. Automatic community aggregation
+was not added: Graph view already exposes explicit community collapse, and
+query results do not currently carry a common community field.
+
 - Labels: only for the nodes on screen that are large enough at the
   current zoom, the most connected first, at most a few hundred at once.
 - Edges: hide the thinnest when zoomed far out; draw arrows and edge

@@ -87,6 +87,13 @@ edge interaction. If WebGL2 is unavailable or its context is lost, the graph
 falls back to Canvas automatically. The hidden `#/bench` diagnostic is also
 available in Desktop builds.
 
+The WebGL view changes detail with zoom. Far out, it keeps a deterministic
+sample of the edges with the best-connected endpoints; approaching restores
+the rest, and arrows and edge labels appear from 0.85×. Node labels are
+ranked by degree, restricted to visible nodes large enough on screen, and
+capped between 120 and 250. Focused, selected and collapsed nodes are placed
+ahead of general candidates.
+
 ```bash
 npm run build
 ```

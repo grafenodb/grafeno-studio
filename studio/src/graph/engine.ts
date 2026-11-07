@@ -6,7 +6,7 @@
 // nodes and edges and listens to what the user does.
 
 import { GraphLayout, type LayoutMode } from "./layout.ts";
-import { usesWebGL, WebGLGraphRenderer } from "./webgl-renderer.ts";
+import { graphLevelOfDetail, usesWebGL, WebGLGraphRenderer } from "./webgl-renderer.ts";
 
 export interface NodeInput {
   id: string;
@@ -130,6 +130,7 @@ export class GraphEngine {
   private edgeById = new Map<string, GraphEdge>();
   private incident = new Map<string, GraphEdge[]>();
   private decorated: GraphNode[] = [];
+  private labelPriority: GraphNode[] = [];
   private readonly layout: GraphLayout;
   private webgl: WebGLGraphRenderer | null | undefined;
   private useWebgl = false;
@@ -258,6 +259,7 @@ export class GraphEngine {
       changed ? (fresh.length === this.nodes.length ? 1 : 0.6) : 0,
     );
     this.decorated = this.nodes.filter((node) => node.ring || node.count !== undefined);
+    this.labelPriority = [...this.nodes].sort((a, b) => (this.neighbors.get(b.id)?.size ?? 0) - (this.neighbors.get(a.id)?.size ?? 0));
     if (usesWebGL(this.nodes.length) && this.webgl === undefined) this.webgl = WebGLGraphRenderer.create(this.canvas);
     this.useWebgl = usesWebGL(this.nodes.length, this.webgl !== null && this.webgl !== undefined);
     this.webgl?.setVisible(this.useWebgl);
@@ -975,7 +977,7 @@ export class GraphEngine {
     ctx.lineWidth = 2.2 / k;
     for (const edge of edges.values()) {
       ctx.setLineDash(edge.ended ? [5, 4] : []);
-      this.drawEdge(edge);
+      this.drawEdge(edge, graphLevelOfDetail(k).arrows);
     }
     ctx.setLineDash([]);
 
@@ -1018,7 +1020,7 @@ export class GraphEngine {
     ctx.restore();
   }
 
-  private drawEdge(edge: GraphEdge): void {
+  private drawEdge(edge: GraphEdge, arrowed = true): void {
     const { ctx } = this;
     const arrow = 7;
     if (edge.source === edge.target) {
@@ -1036,9 +1038,11 @@ export class GraphEngine {
     const end = { x: b.x - Math.cos(angle) * (edge.target.size + 3), y: b.y - Math.sin(angle) * (edge.target.size + 3) };
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
-    if (edge.bend === 0) ctx.lineTo(end.x - Math.cos(angle) * arrow * 0.6, end.y - Math.sin(angle) * arrow * 0.6);
-    else ctx.quadraticCurveTo(c.x, c.y, end.x - Math.cos(angle) * arrow * 0.6, end.y - Math.sin(angle) * arrow * 0.6);
+    const lineEnd = arrowed ? { x: end.x - Math.cos(angle) * arrow * 0.6, y: end.y - Math.sin(angle) * arrow * 0.6 } : end;
+    if (edge.bend === 0) ctx.lineTo(lineEnd.x, lineEnd.y);
+    else ctx.quadraticCurveTo(c.x, c.y, lineEnd.x, lineEnd.y);
     ctx.stroke();
+    if (!arrowed) return;
     ctx.setLineDash([]);
     ctx.beginPath();
     ctx.moveTo(end.x, end.y);
@@ -1085,7 +1089,7 @@ export class GraphEngine {
     for (const node of labelNodes) {
       const r = node.size * k;
       const isLit = !!lit && lit.has(node.id);
-      const show = isLit || this.selected.has(node.id) || (!lit && (r >= 7 || k > 0.9)) || node.count !== undefined;
+      const show = this.useWebgl || isLit || this.selected.has(node.id) || (!lit && (r >= 7 || k > 0.9)) || node.count !== undefined;
       if (!show || node.x === undefined || node.y === undefined) continue;
       if (lit && !isLit && !this.selected.has(node.id)) continue;
       const p = this.toScreen({ x: node.x, y: node.y });
@@ -1100,6 +1104,7 @@ export class GraphEngine {
   }
 
   private largeLabelEdges(focus: string | null, hoverEdge: string | null): GraphEdge[] {
+    if (!graphLevelOfDetail(this.transform.k).edgeLabels) return [];
     const result = new Map<string, GraphEdge>();
     if (focus) for (const edge of (this.incident.get(focus) ?? []).slice(0, 250)) result.set(edge.id, edge);
     for (const id of [hoverEdge, this.selectedEdge]) {
@@ -1112,16 +1117,24 @@ export class GraphEngine {
 
   private largeLabelNodes(focus: string | null): GraphNode[] {
     const result = new Map<string, GraphNode>();
-    const add = (id: string) => {
+    const lod = graphLevelOfDetail(this.transform.k);
+    const add = (id: string, forced = false) => {
       const node = this.byId.get(id);
-      if (node && result.size < 250) result.set(id, node);
+      if (!node || result.size >= lod.maximumLabels || result.has(id)) return;
+      if (!forced) {
+        if (node.size * this.transform.k < lod.minimumLabelPixels || node.x === undefined || node.y === undefined) return;
+        const point = this.toScreen({ x: node.x, y: node.y });
+        if (point.x < -80 || point.y < -40 || point.x > this.width + 80 || point.y > this.height + 40) return;
+      }
+      result.set(id, node);
     };
     if (focus) {
-      add(focus);
+      add(focus, true);
       for (const id of this.neighbors.get(focus) ?? []) add(id);
     }
-    for (const id of this.selected) add(id);
-    for (const node of this.decorated) add(node.id);
+    for (const id of this.selected) add(id, true);
+    for (const node of this.decorated) add(node.id, true);
+    for (const node of this.labelPriority) add(node.id);
     return [...result.values()];
   }
 

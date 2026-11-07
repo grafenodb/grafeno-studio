@@ -47,6 +47,9 @@ engine's repository (engine phase 15).
 - **Large graphs use WebGL2**: above 3,000 nodes, instanced nodes and edges
   render on the GPU with color picking for interaction; small graphs retain
   their existing Canvas look, and Canvas remains the automatic fallback.
+- **Readable detail at every zoom**: large graphs prioritize visible labels
+  by degree, progressively reveal lower-priority edges, and reserve arrows
+  and edge labels for close views while keeping focused items visible.
 - **Installers**: Windows (`.exe`, `.msi`, for the current user), Linux
   (`.deb`, `.rpm`, `.AppImage`); none carries an engine or installs a
   service. The Studio's web build as a `.zip`, for a web server.

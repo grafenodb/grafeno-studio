@@ -198,7 +198,7 @@ def scenario(window, files, artifacts):
         "headers": {"content-type": "application/json"},
         "body": json.dumps({"query": "CREATE (:Person {name: 'No debe aparecer'})"}),
     })
-    assert not stale["ok"] and "session changed" in stale["error"], stale
+    assert not stale["ok"] and "was closed" in stale["error"], stale
     assert window.read_query("MATCH (p:Person) RETURN count(p)") == [[0]]
     checks.append("Cambiar de base, cerrar borradores y rechazar una escritura de la sesión anterior.")
 
@@ -217,19 +217,21 @@ def scenario(window, files, artifacts):
     backup = files / "respaldo completo.redb"
     restored = files / "memoria recuperada.redb"
     current = window.invoke("session")
-    assert window.invoke("backup_database", {"path": str(backup), "sessionUrl": current["url"]}) > 0
+    # The backup comes through the API (GET /v1/backup) from the engine the
+    # app started; the app only writes the file, never over an existing one.
+    reply = window.invoke("request", {"method": "GET", "url": current["url"] + "/v1/backup", "headers": {}})
+    assert reply["status"] == 200, reply
+    assert window.invoke("write_bytes", {"path": str(backup), "bytesBase64": reply["bodyBase64"]}) is None
     original = backup.read_bytes()
     for destination in [first, backup]:
-        refused = window.promise("return await window.__TAURI__.core.invoke('backup_database', arguments[0]);", {
-            "path": str(destination), "sessionUrl": current["url"],
+        refused = window.promise("return await window.__TAURI__.core.invoke('write_bytes', arguments[0]);", {
+            "path": str(destination), "bytesBase64": reply["bodyBase64"],
         })
-        assert not refused["ok"] and "exists already" in refused["error"], refused
-    stale_backup = files / "no debe crearse.redb"
-    refused = window.promise("return await window.__TAURI__.core.invoke('backup_database', arguments[0]);", {
-        "path": str(stale_backup), "sessionUrl": first_session["url"],
+        assert not refused["ok"] and "cannot create" in refused["error"], refused
+    stale = window.promise("return await window.__TAURI__.core.invoke('request', arguments[0]);", {
+        "method": "GET", "url": first_session["url"] + "/v1/backup", "headers": {},
     })
-    assert not refused["ok"] and "session changed" in refused["error"], refused
-    assert not stale_backup.exists()
+    assert not stale["ok"] and "was closed" in stale["error"], stale
     failed_restore = window.promise("return await window.__TAURI__.core.invoke('restore_database', arguments[0]);", {
         "source": str(invalid), "path": str(restored),
     })

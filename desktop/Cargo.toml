@@ -1,9 +1,10 @@
 [package]
 name = "grafeno-desktop"
-description = "Grafeno as a desktop application: the Studio in a native window, with the engine inside"
-version.workspace = true
-edition.workspace = true
-rust-version.workspace = true
+description = "Grafeno Desktop: Grafeno Studio in native windows, speaking to installed engines and servers through their HTTP API"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.88"
+license = "Unspecified"
 default-run = "grafeno-desktop"
 
 [[bin]]
@@ -19,17 +20,10 @@ tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
-grafeno.workspace = true
-# The HTTP API, called in-process; the window gets the Studio from Tauri.
-grafeno-server = { path = "../../crates/grafeno-server", default-features = false }
-axum = "0.8"
-base64 = "0.23"
-tower = { version = "0.5", features = ["util"] }
-http-body-util = "0.1"
-serde.workspace = true
-serde_json.workspace = true
+# No engine crate: local files are served by the installed `grafeno`.
+base64 = "0.22"
+getrandom = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros"] }
 ureq = "3"
-
-[dev-dependencies]
-tokio = { version = "1", features = ["net"] }

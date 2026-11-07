@@ -4,9 +4,13 @@ import { createDesktopFetch } from "./desktop-fetch.ts";
 // `window.__TAURI__` is there, and these helpers reach the app's commands.
 // In a browser they are absent and the Studio works as before.
 
+type Listen = <T>(event: string, handler: (event: { payload: T }) => void) => Promise<() => void>;
+
 interface TauriGlobal {
   core: { invoke: <T>(command: string, args?: Record<string, unknown>) => Promise<T> };
-  event: { listen: <T>(event: string, handler: (event: { payload: T }) => void) => Promise<() => void> };
+  event: { listen: Listen };
+  /** This window: events the app sends to it alone (menus, files to open). */
+  webviewWindow?: { getCurrentWebviewWindow: () => { listen: Listen } };
 }
 
 const tauri = (window as unknown as { __TAURI__?: TauriGlobal }).__TAURI__;
@@ -14,13 +18,29 @@ const tauri = (window as unknown as { __TAURI__?: TauriGlobal }).__TAURI__;
 /** Whether the Studio runs inside the Grafeno desktop app. */
 export const isDesktop = tauri !== undefined;
 
-/** The internal origin; each session gets its own path, which never leaves the process. */
+/**
+ * The internal origin of a window's database file: the app sends its
+ * requests to the engine it started for the file, with that session's
+ * token, which the Studio never sees.
+ */
 export const LOCAL_URL = "http://grafeno.local";
+
+/** Where the engine's installers are explained. */
+export const INSTALL_URL = "https://github.com/Seerendo/grafeno/blob/main/docs/install.md";
+
+/** The Grafeno engine installed on this computer. */
+export interface EngineInfo {
+  path: string;
+  /** Such as `grafeno 0.1.0`. */
+  version: string;
+}
 
 export interface DesktopSession {
   url: string;
   path: string;
   name: string;
+  /** The installed engine serving it. */
+  engine: EngineInfo;
 }
 
 export interface RecentDatabase {
@@ -44,6 +64,10 @@ function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> 
 
 export const desktop = {
   session: () => invoke<DesktopSession | null>("session"),
+  /** The installed engine, or null: database files need one. */
+  engine: () => invoke<EngineInfo | null>("engine_info"),
+  /** Another window, with its own connection. */
+  newWindow: () => invoke<void>("open_window"),
   open: (path: string) => invoke<DesktopSession>("open_database", { path }),
   close: () => invoke<void>("close_database"),
   recent: () => invoke<RecentDatabase[]>("recent"),
@@ -59,7 +83,10 @@ export const desktop = {
   listen: <T>(event: string, handler: (payload: T) => void): (() => void) => {
     let stop: (() => void) | null = null;
     let stopped = false;
-    void tauri?.event.listen<T>(event, (message) => handler(message.payload)).then((unlisten) => {
+    // Each window listens to what is sent to it: a menu acts on the focused window only.
+    const current = tauri?.webviewWindow?.getCurrentWebviewWindow();
+    const listen: Listen | undefined = current ? current.listen.bind(current) : tauri?.event.listen;
+    void listen?.<T>(event, (message) => handler(message.payload)).then((unlisten) => {
       if (stopped) unlisten();
       else stop = unlisten;
     });

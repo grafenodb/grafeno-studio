@@ -1169,6 +1169,13 @@ label.check {
   padding: 2px 10px;
 }
 
+.notice {
+  background: var(--accent-soft, color-mix(in srgb, var(--accent) 12%, transparent));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
 .error {
   color: var(--danger);
   background: var(--danger-soft);

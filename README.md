@@ -15,7 +15,7 @@ cluster's members and Raft groups. See [`studio/README.md`](studio/README.md).
 | Folder | What it is |
 | --- | --- |
 | `studio` | The interface: React and Vite. Its build (`studio/dist`) runs in a browser or inside the desktop app. |
-| `desktop` | Grafeno Desktop, the Tauri application around the Studio. Moved here from the engine's repository as it was; it still links the engine crates by path, so it does not build here until it is rebuilt to talk to engines only over HTTP (the next step of Grafeno's phase 15). |
+| `desktop` | Grafeno Desktop, the Tauri application around the Studio. It has no engine inside: it opens database files by starting the engine installed on the machine, and talks to every engine over HTTP. See [`desktop/README.md`](desktop/README.md). |
 | `client` | A copy of the engine's TypeScript client (`clients/typescript` in the engine's repository), which the Studio calls the API with, kept here until the client is published. |
 
 ## Running it against an engine
@@ -45,6 +45,12 @@ npm run build --prefix studio
 ```bash
 npm test --prefix studio
 ```
+
+```bash
+cd desktop && GRAFENO_BIN=/path/to/grafeno cargo test
+```
+
+The desktop app's tests run against a real engine binary.
 
 ## History
 

@@ -1,26 +1,46 @@
-# Grafeno desktop
+# Grafeno Desktop
 
 [Español](README.es.md) | **English**
 
-Grafeno as a desktop application: Grafeno Studio in a native window, built
-with [Tauri](https://tauri.app). It works two ways:
+Grafeno Studio in native windows, built with [Tauri](https://tauri.app).
+It has **no engine inside**: it speaks to Grafeno engines only through
+their HTTP API, as any client does, and is installed apart from the engine
+(as pgAdmin is from PostgreSQL). Each window has its own connection:
 
-- **On this computer**: open or create a database file (`.redb`). The
-  engine runs inside the app; the Studio's API calls reach it in the same
-  process, so no service is needed and no port is opened. A file can be
-  open in one program at a time: close it in the app before a `grafeno
-  serve` or `grafeno shell` uses it, and the other way around.
-- **A Grafeno server**: the installed service, or one on another machine,
-  with its URL and token. The app sends the requests itself, so the server
-  needs no CORS setting for it.
+- **A database file on this computer** (`.redb`): the app starts the
+  Grafeno engine installed on the machine for that window, as
+  `grafeno serve --db FILE --addr 127.0.0.1:0 --token <one for the session>
+  --stop-with-stdin`, on a loopback port, and talks to it over HTTP. The
+  Studio never sees the port or the token. Closing the file, opening
+  another, closing the window, or the app ending (even by a crash) closes
+  the engine's standard input, and the engine stops cleanly. With no
+  engine installed, the start screen says so and links to its installers.
+- **A Grafeno server**: the service installed on this computer (found on
+  its default address, `127.0.0.1:7810`), one on another machine, or a
+  cluster given by its members (`http://a:7810, http://b:7810`). Servers
+  are kept in a list on the start screen, with a token or key, or signed
+  into after connecting.
 
-The start screen lists recent databases. The File menu creates, opens and
-closes databases, connects to a server, and imports and exports JSON
-Lines with save and open dialogs; the View menu switches views
-(Ctrl+1 to Ctrl+7) and themes. Launching the app with a database path
+Several windows can be open at once (File → New window, Ctrl+Shift+N),
+each with its own file or server. On connecting, the Studio checks the
+engine (`GET /v1/about`): an engine with no API version in common is
+refused, and the views an engine lacks are hidden.
+
+The start screen lists recent databases and saved servers. The File menu
+creates, opens and closes databases, connects to a server, and imports and
+exports; the View menu switches views (Ctrl+1 to Ctrl+7) and themes; menus
+act on the focused window. Launching the app with a database path
 (`grafeno-desktop notes.redb`) opens it; launching it again while it runs
-brings the window forward and opens the new path there. The window keeps
-its size and position.
+opens the new path in the focused window.
+
+## Finding the engine
+
+In order: `GRAFENO_BIN`; `grafeno` on the `PATH`; where the engine's
+installers put it (`C:\Program Files\Grafeno\grafeno.exe` on Windows;
+`/usr/bin/grafeno`, `/usr/local/bin/grafeno`, `~/.local/bin/grafeno` on
+Linux). The first that answers `grafeno --version` is used; the start
+screen shows which. Any engine from 0.1.0 with `--stop-with-stdin` and
+`grafeno restore` (engine phase 15.4) works.
 
 ## Building
 
@@ -31,173 +51,79 @@ cd studio && npm ci && npm run build
 ```
 
 ```bash
-cargo run -p grafeno-desktop
+cd desktop && cargo run
 ```
 
 ```bash
-cargo run -p grafeno-desktop -- path/to/notes.redb
+cd desktop && npx tauri build
 ```
 
-On Windows the window uses WebView2, part of Windows 10 and 11. On Linux,
-Tauri needs WebKitGTK and its development files, for example on Debian or
-Ubuntu:
+The last one builds the installers (`.exe` and `.msi` on Windows; `.deb`,
+`.rpm`, `.AppImage` on Linux); none carries an engine. On Windows the
+window uses WebView2, part of Windows 10 and 11. On Linux, Tauri needs
+WebKitGTK and its development files, for example on Debian or Ubuntu:
 
 ```bash
 sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev
 ```
 
-Installers (`.exe`, `.msi`, `.deb`, `.rpm`, `.AppImage`) are built with the
-Tauri bundler (phase 9.5).
-
 ## How it works
 
-- `src/main.rs`: the window, the menu and the commands the Studio calls
-  (`session`, `open_database`, `close_database`, `recent`,
-  `pick_database`, `pick_save`, `pick_open`, `read_text`, `write_text`,
-  `open_external`, `request`).
-- `request` is the Studio's `fetch`: for `http://grafeno.local/…` it calls
-  the open database's HTTP router (`grafeno_server::http`) in-process; for
-  other addresses it sends the request from the app.
-- The Studio notices the app (`window.__TAURI__`, see
-  `studio/src/desktop.ts`): it shows the start screen instead of the
-  connect screen, saves files with dialogs, opens web links in the system
-  browser and follows the menu.
+- `src/engine.rs`: finding the installed engine, starting it for a file
+  (waiting for its `listening on` line, refusing a file another program
+  holds with a clear message), stopping it, and `grafeno restore` for
+  recovering backups.
+- `src/bridge.rs`: the HTTP transport. Every request of the Studio goes
+  through the `request` command: `http://grafeno.local/session/<id>/…` to
+  the engine serving that window's file (with the session's token), any
+  other address to that server; so no server needs to allow the app as a
+  browser origin. UTF-8 text travels in `body`; other bytes (a backup) in
+  `bodyBase64`, never both.
+- `src/main.rs`: the windows, the menu and the commands the Studio calls
+  (`session`, `engine_info`, `open_database`, `close_database`,
+  `open_window`, `recent`, `forget_recent`, `pick_database`, `pick_save`,
+  `pick_open`, `read_text`, `write_text`, `write_bytes`, `open_external`,
+  `restore_database`, `request`).
+- Backups go through the API (`GET /v1/backup`), for a file and a server
+  alike; the app only writes the file the user picked, never over an
+  existing one. Recovering a backup runs `grafeno restore` into a new
+  file, then opens it.
 - Recent databases are kept in `recent.json` in the app's configuration
   folder (`%APPDATA%\dev.grafeno.desktop` on Windows,
-  `~/.config/dev.grafeno.desktop` on Linux).
+  `~/.config/dev.grafeno.desktop` on Linux); saved servers in the window's
+  local storage.
 
-## Local database sessions
-
-Opening another file only replaces the current session after the new database
-and its router are ready. If opening fails, the current database remains usable
-and the interface reports the error without disconnecting. Reopening the same
-canonical path (including a symbolic link) reuses its session and owner token.
-
-`src/local_database.rs` keeps this lifecycle separate from the window. Its tests
-cover persistence after closing, switching between files, equivalent paths,
-invalid and truncated files, missing directories, Unix file permissions and a lock held by a
-child process:
+## Tests
 
 ```bash
-cargo test --locked -p grafeno-desktop local_database::tests
+GRAFENO_BIN=/path/to/grafeno cargo test
 ```
 
-The ignored helper test is executed by the lock test in a child process. Unix
-permission checks require an unprivileged user; the test reports when its user
-can bypass read-only permissions. These tests do not launch the window and do
-not replace a full checksum scan of a potentially damaged database.
+They run against the real engine binary: a file served by the engine on a
+loopback port, the token required, a backup through the API recovered by
+`grafeno restore`, a file held by another engine refused, closing stopping
+the engine cleanly (the file reopens with its data), no engine left
+running after a session ends, and a file the engine cannot open refused
+with its reason; plus the transport (binary bodies, error statuses, an
+unreachable engine). The Studio's own tests: `npm test --prefix studio`.
 
-Each session has its own internal URL. Late requests from another session are
-rejected; requests that already captured their router finish on the original
-database. Closing and reopening a file invalidates its previous URL. Tests cover
-both delayed requests and a write dispatched before switching databases.
-
-## Automated window test on Linux
-
-The test runs the real Tauri binary with WebKitWebDriver on a virtual display,
-following the [official Tauri guide](https://v2.tauri.app/develop/tests/webdriver/ci/).
-Temporary configuration, data and cache directories isolate the user's settings
-and WebView storage. After preparing desktop libraries and building Studio:
+`tests/ui_smoke.py` drives the real window with WebKitWebDriver on a
+virtual display (Linux), following the
+[Tauri guide](https://v2.tauri.app/develop/tests/webdriver/ci/); it needs
+the engine too (`GRAFENO_BIN`):
 
 ```bash
 sudo apt-get install -y webkit2gtk-driver xvfb xauth dbus-x11
 cargo install tauri-driver --locked
-cargo build --locked -p grafeno-desktop
-dbus-run-session -- xvfb-run -a -s "-screen 0 1600x1000x24" python3 apps/desktop/tests/ui_smoke.py
+cargo build --locked
+GRAFENO_BIN=/usr/bin/grafeno dbus-run-session -- xvfb-run -a -s "-screen 0 1600x1000x24" python3 tests/ui_smoke.py
 ```
 
-It checks startup, database creation, saving a node through its form, failed
-opening without disconnection, separation between databases, rejection of a
-write from the previous session, closing drafts when switching databases, and
-reopening through the recent-files list.
-File opens use the same event as the menu; native file pickers are neither
-mocked nor considered tested.
+## Tauri or Electron
 
-Screenshots and diagnostics go to `reports/desktop-e2e/` (ignored by Git).
-CI retains them for seven days in the `pruebas-escritorio-linux` artifact.
-These tests do not replace manual checks on supported operating systems or
-validate installers.
-
-The test client keeps a persistent HTTP connection. It retries only reads,
-with a fixed limit, when the driver closes the connection; it never retries
-clicks, typing or commands that may modify data. Its five transport tests run
-without Tauri:
-
-```bash
-python3 -m unittest discover -s apps/desktop/tests -p 'test_*.py'
-```
-
-## Backups and recovery
-
-To create a local backup, open **Administration → Back up the database** and
-choose a new filename. It includes every namespace and access key, using a
-consistent snapshot while writes continue. If you switch databases while the
-save dialog is open, the operation fails instead of backing up another database.
-
-To recover, close the database and choose **Recuperar una copia…** on the start
-screen. Select a completed backup and a new destination. The app copies it to
-its own temporary file, verifies checksums and checks every namespace before
-publishing the recovered database. It then opens that database. The original
-backup is read without modification; failed validation leaves the session alone.
-If the subsequent open fails, the recovered file remains available.
-
-Backup and recovery never replace existing files, directories or links, even
-if the system dialog offers to replace them: choose another name. Each operation
-owns a unique temporary file beside its destination and cleans it up on ordinary
-errors. Existing `.partial` files are left alone. A process or system interruption
-may leave a temporary file requiring separate inspection. Use completed backups,
-not live database files being written by another process. If verification reports
-that it repaired the copy, publication is rejected.
-
-In Rust, `Grafeno::restore_backup(source, destination)` provides the same recovery
-without opening or replacing a session. The engine backup API retains its
-no-overwrite policy and now protects against temporary-name collisions and
-destinations created while the backup is being written.
-
-```bash
-cargo test --locked -p grafeno --test backup
-cargo test --locked -p grafeno --lib backup::tests
-cargo test --locked -p grafeno-desktop local_database::tests
-```
-
-The window test also creates a backup, refuses existing destinations and an
-expired session, rejects an invalid recovery and opens a valid recovered database
-with its data intact. Native file dialogs still need manual testing.
-
-## HTTP bridge contract
-
-`src/bridge.rs` contains local and remote transport without a Tauri dependency.
-`studio/src/desktop-fetch.ts` adapts Studio requests to that contract. UTF-8 text
-travels in `body`; replies containing other bytes include `bodyBase64` and an
-empty `body`. Requests accept either `body` or `bodyBase64`, never both. This
-preserves binary backups without replacing invalid UTF-8 bytes with characters.
-Existing text callers remain compatible.
-
-The adapter normalizes `Request`, URL and `RequestInit`, preserving the method,
-headers and body bytes. HTTP statuses, including errors, remain responses;
-HEAD, 204, 205 and 304 have no response body.
-
-`AbortSignal` stops waiting and prevents dispatch when aborted beforehand. An
-already dispatched command may continue and commit: aborting neither rolls back
-a write nor stops an engine query. The adapter does not automatically resend a
-failed command. Bodies are fully buffered in memory; this change does not add
-streaming or implement every browser `fetch` option.
-
-```bash
-npm test --prefix studio
-cargo test --locked -p grafeno-desktop bridge::tests
-```
-
-Tests cover Unicode, byte values 0 through 255, real remote HTTP transport,
-error statuses, Request objects, cancellation and the JSON wire format. The
-window test obtains a binary backup through the Tauri command, restores it
-and checks the resulting database contents.
-
-The [batched read API](../../docs/read-many.md) also works through the local
-bridge. The window test checks nodes, edges, duplicates and missing records
-in one `read-many` request.
-
-[Visual expansion](../../docs/graph-expansion.md) groups eight neighborhoods per
-request and discards obsolete loads. The native test counts calls for 18 roots,
-applies a date and verifies that clearing is not undone by pending replies,
-including the initial “Show all” list.
+Measured on one laptop (Windows 11, WebView2), with the same Studio build
+(0.9 MB), recorded in the engine's `DESIGN.md` (phase 15.4): the Tauri
+installer is 3.1 MB (NSIS) or 4.4 MB (MSI), where Electron's runtime alone
+is 110 MB compressed; memory is about the same (WebView2 is Chromium too:
+about 375 MB of working set for Tauri's window and its WebView2 processes,
+330 MB for Electron's). Tauri is kept.

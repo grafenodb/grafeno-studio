@@ -31,3 +31,28 @@ jobs:
         run: npm test --prefix studio
       - name: Type-check and build the Studio
         run: npm run build --prefix studio
+
+  desktop:
+    name: Desktop app against the engine
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Seerendo/grafeno
+          path: engine
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Tauri's system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev
+      - name: Build the engine
+        run: cargo build --locked -p grafeno-server --manifest-path engine/Cargo.toml
+      - name: Build the Studio (the window shows it)
+        run: npm ci --prefix studio --no-audit --no-fund && npm run build --prefix studio
+      - name: Test the desktop app against the engine binary
+        run: GRAFENO_BIN="$PWD/engine/target/debug/grafeno" cargo test --manifest-path desktop/Cargo.toml

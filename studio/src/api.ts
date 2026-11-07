@@ -79,16 +79,80 @@ export function forgetConnection(): void {
   }
 }
 
+/** A server kept in the list of the start screen. */
+export interface SavedServer {
+  name: string;
+  /** One address, or a cluster's members separated by commas. */
+  url: string;
+  /** A token or API key, if one is kept. */
+  token: string;
+}
+
+const SERVERS_KEY = "grafeno.studio.servers";
+
+/** The servers kept on this computer, most recently used first. */
+export function loadServers(): SavedServer[] {
+  try {
+    const saved = window.localStorage.getItem(SERVERS_KEY);
+    const list = saved ? (JSON.parse(saved) as SavedServer[]) : [];
+    return Array.isArray(list) ? list.filter((server) => typeof server?.url === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Keeps a server (replacing one with the same address) at the top of the list. */
+export function saveServer(server: SavedServer): SavedServer[] {
+  const list = [server, ...loadServers().filter((other) => other.url !== server.url)].slice(0, 20);
+  try {
+    window.localStorage.setItem(SERVERS_KEY, JSON.stringify(list));
+  } catch {
+    // Not kept: the connection still works for this window.
+  }
+  return list;
+}
+
+export function forgetServer(url: string): SavedServer[] {
+  const list = loadServers().filter((other) => other.url !== url);
+  try {
+    window.localStorage.setItem(SERVERS_KEY, JSON.stringify(list));
+  } catch {
+    // Nothing to forget.
+  }
+  return list;
+}
+
+/** The address of the Grafeno service installed on this computer. */
+export const LOCAL_SERVICE = "http://127.0.0.1:7810";
+
+/**
+ * The installed service, if it answers on its default address: what it is
+ * (`GET /v1/about`, public), or null.
+ */
+export async function findLocalService(): Promise<About | null> {
+  try {
+    return await clientFor({ url: LOCAL_SERVICE, token: "" }).about();
+  } catch {
+    return null;
+  }
+}
+
 /** The server that served the Studio, when it was `grafeno serve`. */
 export function defaultUrl(): string {
   return window.location.origin;
 }
 
+/** The members of a cluster are given as one address each, separated by commas. */
+export function memberUrls(url: string): string[] {
+  return url.split(",").map((member) => member.trim().replace(/\/+$/, "")).filter((member) => member !== "");
+}
+
 export function clientFor(connection: Connection): Grafeno {
-  // In the desktop app, requests go through the app (no CORS, and the
-  // open database answers in-process).
+  // In the desktop app, requests go through the app (no CORS; a database
+  // file answers from the engine the app started for it).
+  const members = memberUrls(connection.url);
   return new Grafeno({
-    url: connection.url,
+    url: members.length > 1 ? members : connection.url,
     token: connection.refresh ? undefined : connection.token || undefined,
     session: connection.refresh ? { access_token: connection.token, refresh_token: connection.refresh } : undefined,
     onSession: connection.refresh ? (tokens) => keepTokens(connection.url, tokens) : undefined,

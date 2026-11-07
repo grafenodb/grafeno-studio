@@ -1,0 +1,33 @@
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  studio:
+    name: Studio
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+      - name: Install the Studio's dependencies
+        run: npm ci --prefix studio --no-audit --no-fund
+      - name: Test the Studio
+        run: npm test --prefix studio
+      - name: Type-check and build the Studio
+        run: npm run build --prefix studio

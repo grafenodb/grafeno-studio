@@ -26,6 +26,11 @@ pgAdmin aparte de PostgreSQL). Cada ventana tiene su propia conexión:
   su primer administrador con el token; "Continue with the token only"
   trabaja con los permisos del token, sin cuenta.
 
+La aplicación sí incluye SQLite para datos exclusivos del cliente, como la
+biblioteca local de scripts. Esa base vive en el directorio privado de
+configuración de la aplicación y no pertenece a ninguna base o servidor de
+Grafeno. No hace falta instalar SQLite ni otro servicio.
+
 Se pueden abrir varias ventanas a la vez (Archivo → Nueva ventana,
 Ctrl+Shift+N), cada una con su archivo o servidor. Al conectar, el Studio
 revisa el motor (`GET /v1/about`): rechaza uno sin versión de la API en

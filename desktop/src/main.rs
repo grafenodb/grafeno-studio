@@ -24,8 +24,10 @@ use tauri_plugin_opener::OpenerExt;
 
 mod bridge;
 mod engine;
+mod local_store;
 use bridge::Reply;
 use engine::{EngineInfo, LOCAL_URL, LocalEngine, file_name};
+use local_store::LocalStore;
 
 /// Recent databases kept in the menu and on the start screen.
 const RECENT: usize = 10;
@@ -553,10 +555,17 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(Desktop::default())
+        .manage(LocalStore::default())
         .setup(|app| {
             let handle = app.handle().clone();
             let desktop = handle.state::<Desktop>();
             *desktop.recent.lock().expect("not poisoned") = load_recent(&handle);
+            let client_database = handle
+                .path()
+                .app_config_dir()
+                .map_err(|error| format!("cannot locate the client data directory: {error}"))?
+                .join("client.sqlite3");
+            handle.state::<LocalStore>().initialize(&client_database)?;
             rebuild_menu(&handle)?;
             handle.on_menu_event(|app, event| on_menu(app, event.id().as_ref()));
             let args: Vec<String> = std::env::args().collect();
@@ -593,6 +602,11 @@ fn main() {
             write_bytes,
             restore_database,
             request,
+            local_store::local_scripts,
+            local_store::local_put_script,
+            local_store::local_delete_script,
+            local_store::local_setting,
+            local_store::local_put_setting,
         ])
         .build(tauri::generate_context!())
         .expect("the Grafeno window could not start");

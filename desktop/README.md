@@ -26,6 +26,11 @@ their HTTP API, as any client does, and is installed apart from the engine
   administrator with the token; "Continue with the token only" works with
   the token's rights, without an account.
 
+The application does contain SQLite for client-only data such as the local
+script library. That database lives in the application's private
+configuration directory and is unrelated to every Grafeno database or
+server. No SQLite installation or service is required.
+
 Several windows can be open at once (File → New window, Ctrl+Shift+N),
 each with its own file or server. On connecting, the Studio checks the
 engine (`GET /v1/about`): an engine with no API version in common is

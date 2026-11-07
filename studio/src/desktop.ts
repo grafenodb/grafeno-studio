@@ -13,7 +13,7 @@ interface TauriGlobal {
   webviewWindow?: { getCurrentWebviewWindow: () => { listen: Listen } };
 }
 
-const tauri = (window as unknown as { __TAURI__?: TauriGlobal }).__TAURI__;
+const tauri = typeof window === "undefined" ? undefined : (window as unknown as { __TAURI__?: TauriGlobal }).__TAURI__;
 
 /** Whether the Studio runs inside the Grafeno desktop app. */
 export const isDesktop = tauri !== undefined;
@@ -49,6 +49,17 @@ export interface RecentDatabase {
   exists: boolean;
 }
 
+export interface StoredScript {
+  owner: string;
+  id: string;
+  name: string;
+  text: string;
+  namespace: string | null;
+  createdAt: number;
+  updatedAt: number;
+  lastOpenedAt: number;
+}
+
 function toBase64(bytes: Uint8Array): string {
   const chunks: string[] = [];
   for (let start = 0; start < bytes.length; start += 32768) {
@@ -80,6 +91,11 @@ export const desktop = {
   openExternal: (url: string) => invoke<void>("open_external", { url }),
   writeBytes: (path: string, bytes: ArrayBuffer) => invoke<void>("write_bytes", { path, bytesBase64: toBase64(new Uint8Array(bytes)) }),
   restoreTo: (source: string, path: string) => invoke<number>("restore_database", { source, path }),
+  localScripts: (owner: string) => invoke<StoredScript[]>("local_scripts", { owner }),
+  localPutScript: (script: StoredScript) => invoke<void>("local_put_script", { script }),
+  localDeleteScript: (owner: string, id: string) => invoke<void>("local_delete_script", { owner, id }),
+  localSetting: (owner: string, key: string) => invoke<string | null>("local_setting", { owner, key }),
+  localPutSetting: (owner: string, key: string, value: string) => invoke<void>("local_put_setting", { owner, key, value }),
   listen: <T>(event: string, handler: (payload: T) => void): (() => void) => {
     let stop: (() => void) | null = null;
     let stopped = false;

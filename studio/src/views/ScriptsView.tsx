@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 
 import { type QueryResult, describeError, go, labelColor } from "../api.ts";
+import { ACTIVE_SCRIPT, clientStorage, migrateLegacyScripts, requestPersistentBrowserStorage, resolveOwner, type StoredScript } from "../client-storage.ts";
 import { Chart, canChart } from "../components/Chart.tsx";
 import { type CodeEditorHandle, CodeEditor } from "../components/CodeEditor.tsx";
 import { MiniGraph, hasGraph } from "../components/MiniGraph.tsx";
@@ -10,17 +11,10 @@ import { useStudio } from "../context.ts";
 import { saveText } from "../desktop.ts";
 import { PSEUDO_PROPERTIES, type Statement, errorPosition, splitStatements, statementAt } from "../gq.ts";
 import { Icon } from "../icons.tsx";
+import { exportScriptLibrary, importScriptLibrary, type ScriptLibrary } from "../script-library.ts";
 
-interface Script {
-  id: string;
-  name: string;
-  text: string;
-}
-
-interface Library {
-  scripts: Script[];
-  active: string;
-}
+type Script = StoredScript;
+type Library = ScriptLibrary;
 
 interface Run {
   statement: Statement;
@@ -32,7 +26,6 @@ interface Run {
   ms: number;
 }
 
-const STORAGE_KEY = "grafeno.studio.scripts";
 const LAYOUT_KEY = "grafeno.studio.scripts.split";
 
 const WELCOME = `// Grafeno script: GQ statements, each ending with ;
@@ -83,23 +76,9 @@ function newId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
-function loadLibrary(): Library {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null") as Library | null;
-    if (saved?.scripts?.length) return saved;
-  } catch {
-    // A broken library starts over.
-  }
-  const id = newId();
-  return { scripts: [{ id, name: "Welcome", text: WELCOME }], active: id };
-}
-
-function saveLibrary(library: Library): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
-  } catch {
-    // Scripts then last only for this page.
-  }
+function createScript(owner: string, name: string, text: string, namespace: string | null): Script {
+  const now = Date.now();
+  return { owner, id: newId(), name, text, namespace, createdAt: now, updatedAt: now, lastOpenedAt: now };
 }
 
 function changes(stats: QueryResult["stats"]): string {
@@ -128,8 +107,14 @@ function download(name: string, text: string, type: string): void {
 }
 
 export function ScriptsView() {
-  const { client, namespace, schema, changed, confirm, toast } = useStudio();
-  const [library, setLibrary] = useState(loadLibrary);
+  const { client, connection, namespace, schema, changed, confirm, toast } = useStudio();
+  const [library, setLibrary] = useState<Library>(() => {
+    const welcome = createScript("", "Welcome", WELCOME, null);
+    return { scripts: [welcome], active: welcome.id };
+  });
+  const [owner, setOwner] = useState<string | null>(null);
+  const [libraryReady, setLibraryReady] = useState(false);
+  const [saveState, setSaveState] = useState<"loading" | "saving" | "saved" | "error">("loading");
   const [runs, setRuns] = useState<Run[]>([]);
   const [running, setRunning] = useState(false);
   const [stopOnError, setStopOnError] = useState(true);
@@ -145,19 +130,70 @@ export function ScriptsView() {
   const active = library.scripts.find((script) => script.id === library.active) ?? library.scripts[0];
 
   useEffect(() => {
-    const timer = window.setTimeout(() => saveLibrary(library), 300);
+    let alive = true;
+    setLibraryReady(false);
+    setSaveState("loading");
+    void resolveOwner(client, connection)
+      .then(async (resolved) => {
+        await migrateLegacyScripts(resolved);
+        let scripts = await clientStorage.scripts(resolved);
+        let activeId = await clientStorage.setting(resolved, ACTIVE_SCRIPT);
+        if (scripts.length === 0) {
+          const welcome = createScript(resolved, "Welcome", WELCOME, null);
+          scripts = [welcome];
+          activeId = welcome.id;
+          await clientStorage.putScript(welcome);
+          await clientStorage.putSetting(resolved, ACTIVE_SCRIPT, welcome.id);
+        }
+        if (!scripts.some((script) => script.id === activeId)) activeId = scripts[0].id;
+        if (!alive) return;
+        setOwner(resolved);
+        setLibrary({ scripts, active: activeId! });
+        setLibraryReady(true);
+        setSaveState("saved");
+        void requestPersistentBrowserStorage();
+      })
+      .catch((problem) => {
+        if (!alive) return;
+        const fallbackOwner = `${connection.url}|${connection.user ?? "anonymous"}`;
+        setOwner(fallbackOwner);
+        setLibrary((current) => ({
+          ...current,
+          scripts: current.scripts.map((script) => ({ ...script, owner: fallbackOwner })),
+        }));
+        setLibraryReady(true);
+        setSaveState("error");
+        toast(`Local scripts are unavailable: ${describeError(problem)}`, "error");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [client, connection, toast]);
+
+  useEffect(() => {
+    if (!libraryReady || !owner) return;
+    setSaveState("saving");
+    const timer = window.setTimeout(() => {
+      void Promise.all([
+        ...library.scripts.map((script) => clientStorage.putScript(script)),
+        clientStorage.putSetting(owner, ACTIVE_SCRIPT, library.active),
+      ])
+        .then(() => setSaveState("saved"))
+        .catch(() => setSaveState("error"));
+    }, 300);
     return () => window.clearTimeout(timer);
-  }, [library]);
+  }, [library, libraryReady, owner]);
 
   const update = (patch: Partial<Script>, id = active.id) =>
     setLibrary((current) => ({
       ...current,
-      scripts: current.scripts.map((script) => (script.id === id ? { ...script, ...patch } : script)),
+      scripts: current.scripts.map((script) => (script.id === id ? { ...script, ...patch, updatedAt: Date.now() } : script)),
     }));
 
   const addScript = (name: string, text: string) => {
-    const id = newId();
-    setLibrary((current) => ({ scripts: [...current.scripts, { id, name, text }], active: id }));
+    if (!owner) return;
+    const script = createScript(owner, name, text, namespace);
+    setLibrary((current) => ({ scripts: [...current.scripts, script], active: script.id }));
     setRuns([]);
   };
 
@@ -167,10 +203,17 @@ export function ScriptsView() {
     }
     setLibrary((current) => {
       const scripts = current.scripts.filter((item) => item.id !== script.id);
-      if (scripts.length === 0) scripts.push({ id: newId(), name: "Script 1", text: "" });
+      if (scripts.length === 0 && owner) scripts.push(createScript(owner, "Script 1", "", namespace));
       const active = current.active === script.id ? scripts[Math.max(0, current.scripts.indexOf(script) - 1)]?.id ?? scripts[0].id : current.active;
       return { scripts, active };
     });
+    if (owner) {
+      try {
+        await clientStorage.deleteScript(owner, script.id);
+      } catch (problem) {
+        toast(`The script closed but its local record could not be removed: ${describeError(problem)}`, "error");
+      }
+    }
   };
 
   const labels = useMemo(() => ({ labels: Object.keys(schema.labels), edgeLabels: Object.keys(schema.edgeLabels) }), [schema]);
@@ -269,13 +312,44 @@ export function ScriptsView() {
   const total = runs.reduce((sum, run) => sum + run.ms, 0);
   const openNode = useCallback((id: string) => go("explorer", id), []);
 
+  const importLibrary = async (file: File) => {
+    if (!owner) return;
+    try {
+      const imported = importScriptLibrary(await file.text(), owner, library.scripts.map((script) => script.id), newId);
+      setLibrary((current) => ({ scripts: [...current.scripts, ...imported.scripts], active: imported.active }));
+      setRuns([]);
+      toast(`Imported ${imported.scripts.length} script${imported.scripts.length === 1 ? "" : "s"}.`, "ok");
+    } catch (problem) {
+      toast(describeError(problem), "error");
+    }
+  };
+
+  const exportLibrary = () => {
+    const day = new Date().toISOString().slice(0, 10);
+    download(`grafeno-scripts-${day}.json`, exportScriptLibrary(library), "application/json");
+  };
+
+  if (!libraryReady) {
+    return (
+      <div className="scripts">
+        <div className="workspace script-library-loading">
+          <Icon name="clock" size={18} />
+          <span>Loading the local script library…</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="scripts">
       {showSchema && (
         <aside className="schema">
           <div className="schema-head">
             <span>Schema</span>
-            <span className="muted small">{namespace}</span>
+            <span className="muted small schema-namespace">{namespace}</span>
+            <button className="ghost icon-button schema-close" onClick={() => setShowSchema(false)} aria-label="Close schema">
+              <Icon name="x" size={14} />
+            </button>
           </div>
           <SchemaGroup title="Node labels" empty="No nodes yet.">
             {Object.entries(schema.labels)
@@ -334,7 +408,10 @@ export function ScriptsView() {
               className={script.id === active.id ? "script-tab active" : "script-tab"}
               onClick={() => {
                 if (script.id !== active.id) {
-                  setLibrary((current) => ({ ...current, active: script.id }));
+                  setLibrary((current) => ({
+                    active: script.id,
+                    scripts: current.scripts.map((item) => (item.id === script.id ? { ...item, lastOpenedAt: Date.now() } : item)),
+                  }));
                   setRuns([]);
                 }
               }}
@@ -393,8 +470,12 @@ export function ScriptsView() {
           <label className="check small">
             <input type="checkbox" checked={stopOnError} onChange={(event) => setStopOnError(event.target.checked)} /> Stop on error
           </label>
+          <span className={`local-save-state ${saveState}`} title="Scripts are stored only on this computer">
+            <Icon name={saveState === "error" ? "x" : saveState === "saving" || saveState === "loading" ? "clock" : "check"} size={13} />
+            {saveState === "loading" ? "Loading library…" : saveState === "saving" ? "Saving…" : saveState === "error" ? "Local save unavailable" : "Saved locally"}
+          </span>
           <div className="spacer" />
-          <label className="ghost button" title="Open a .gq file">
+          <label className="ghost button" title="Add a .gq file to this local library">
             <Icon name="folder" /> Open
             <input
               type="file"
@@ -407,8 +488,24 @@ export function ScriptsView() {
               }}
             />
           </label>
-          <button className="ghost" onClick={() => download(`${active.name}.gq`, active.text, "text/plain")} title="Download as a .gq file">
+          <button className="ghost" onClick={() => download(`${active.name}.gq`, active.text, "text/plain")} title="Download this script as a .gq file">
             <Icon name="save" /> Save
+          </button>
+          <label className="ghost button" title="Merge a Grafeno script library from this computer">
+            <Icon name="upload" /> Import library
+            <input
+              type="file"
+              accept=".json,application/json"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (file) void importLibrary(file);
+              }}
+            />
+          </label>
+          <button className="ghost" onClick={exportLibrary} title="Download all local scripts as a portable library">
+            <Icon name="download" /> Export library
           </button>
           <a className="ghost button" href="https://github.com/grafenodb/grafeno/blob/main/docs/query-language.md" target="_blank" rel="noreferrer">
             Reference

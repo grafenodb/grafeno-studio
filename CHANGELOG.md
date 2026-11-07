@@ -57,6 +57,15 @@ engine's repository (engine phase 15).
 - **Web and Desktop graph parity**: both releases use the same worker,
   WebGL2 renderer, zoom-aware detail, GPU picking and optional WebGPU paths
   from the shared Studio build.
+- **Local script library**: scripts are isolated by server account and kept
+  only on the user's computer, in IndexedDB on the web and bundled SQLite on
+  Desktop. Existing `localStorage` scripts migrate automatically.
+- **Portable scripts**: complete local libraries can be imported and
+  exported as versioned JSON without credentials; individual `.gq` files
+  remain supported and the toolbar reports local save state.
+- **Responsive workspace**: compact and narrow layouts center page content,
+  scroll dense toolbars safely, expose the script schema as a drawer, adapt
+  forms and dialogs, and move graph inspection into a bottom sheet.
 - **Installers**: Windows (`.exe`, `.msi`, for the current user), Linux
   (`.deb`, `.rpm`, `.AppImage`); none carries an engine or installs a
   service. The Studio's web build as a `.zip`, for a web server.

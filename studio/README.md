@@ -124,3 +124,22 @@ This exact `dist/` is also the desktop app's window (`../desktop`). There,
 `src/desktop.ts` sends requests through the app, the start screen opens
 database files or connects to a server, files are saved with dialogs and
 the native menu drives the views.
+
+## Local script library
+
+Scripts belong to the current server account and stay on the computer; they
+are never written to the Grafeno engine. Hosted Studio stores them in
+IndexedDB and requests persistent browser storage when available. Grafeno
+Desktop stores them in an embedded SQLite database under the app's private
+configuration directory. Neither deployment needs a separate database
+installation.
+
+Existing scripts from the former `localStorage` library migrate on first
+use. **Import library** merges a portable Grafeno script-library JSON file,
+while **Export library** downloads every local script without credentials or
+the local owner key. Individual `.gq` files can still be opened and saved.
+
+The responsive shell supports wide desktop windows, compact windows and
+narrow browser screens. On narrow screens, navigation and toolbars scroll
+horizontally, the script schema opens as a drawer, and graph inspection moves
+to a bottom sheet.

@@ -62,6 +62,8 @@ export interface Events {
   connect: (from: string, to: string) => void;
   /** The view moved or zoomed (for the minimap and overlays). */
   view?: () => void;
+  /** A frame was painted; used by the development benchmark. */
+  frame?: (at: number) => void;
 }
 
 export interface Palette {
@@ -352,6 +354,15 @@ export class GraphEngine {
   zoomBy(factor: number): void {
     const center = this.freeCenter();
     this.zoomAround(center, this.transform.k * factor, true);
+  }
+
+  /** Moves the viewport in screen pixels (also used by the benchmark). */
+  panBy(dx: number, dy: number): void {
+    this.transform = { ...this.transform, x: this.transform.x + dx, y: this.transform.y + dy };
+    this.tween = null;
+    this.inertia = null;
+    this.request();
+    this.events.view?.();
   }
 
   /** Screen position of a node, relative to the canvas. */
@@ -768,6 +779,7 @@ export class GraphEngine {
       this.step();
       this.draw();
       this.drawMinimap();
+      this.events.frame?.(performance.now());
     });
   }
 

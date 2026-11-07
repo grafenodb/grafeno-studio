@@ -64,6 +64,11 @@ npm run dev
 to a `grafeno serve` on `127.0.0.1:7810` (start one first, for example
 `grafeno serve --memory`), or to the server in `GRAFENO_URL`.
 
+The development-only graph benchmark needs no engine. Open
+`/#/bench?nodes=10000` and optionally set `edges`, `shape` (`random`,
+`scale-free` or `grid`) and `seed`. It reports time to first frame, pan
+frame rate and main-thread long tasks on screen and in `console.table`.
+
 ```bash
 npm run build
 ```

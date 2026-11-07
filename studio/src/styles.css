@@ -2591,6 +2591,65 @@ button.schema-item {
   }
 }
 
+/* ----------------------------------------------------------- benchmark */
+
+.benchmark-page {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--background);
+}
+
+.benchmark-page > canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.benchmark-panel {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: min(330px, calc(100vw - 40px));
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.benchmark-panel h1,
+.benchmark-panel p {
+  margin: 0;
+}
+
+.benchmark-panel dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0;
+}
+
+.benchmark-panel dl > div {
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+
+.benchmark-panel dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.benchmark-panel dd {
+  margin: 3px 0 0;
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
 /* ------------------------------------------------------------- connect */
 
 .connect {

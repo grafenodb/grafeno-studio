@@ -35,6 +35,9 @@ engine's repository (engine phase 15).
 - **The Studio**: checks each engine (`connect()`), refuses one with no API
   version in common, hides the views an engine lacks, and backs up through
   `GET /v1/backup`.
+- **Graph benchmark**: a development-only, deterministic 1k–50k-node
+  benchmark records time to first frame, pan frame rate and main-thread
+  long tasks before the large-graph renderer changes.
 - **Installers**: Windows (`.exe`, `.msi`, for the current user), Linux
   (`.deb`, `.rpm`, `.AppImage`); none carries an engine or installs a
   service. The Studio's web build as a `.zip`, for a web server.

@@ -1,24 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
-import { type Edge, type Node, displayName, labelColor } from "../api.ts";
+import { type Edge, displayName, go, labelColor } from "../api.ts";
 import { useStudio } from "../context.ts";
 import { type EdgeInput, GraphEngine, type NodeInput } from "../graph/engine.ts";
+import { collectGraph, hasGraphValue, MAX_DRAWN } from "../graph/result-graph.ts";
 import { enginePalette, useThemeVersion } from "../graph/theme.ts";
-
-function collect(value: unknown, nodes: Map<string, Node>, edges: Map<string, Edge>): void {
-  if (Array.isArray(value)) {
-    for (const item of value) collect(item, nodes, edges);
-  } else if (value && typeof value === "object") {
-    if ("labels" in value && "created_at" in value) nodes.set((value as Node).id, value as Node);
-    else if ("from" in value && "recorded_at" in value) edges.set((value as Edge).id, value as Edge);
-  }
-}
 
 /** Whether the rows hold nodes, so they can be drawn. */
 export function hasGraph(rows: unknown[][]): boolean {
-  const nodes = new Map<string, Node>();
-  collect(rows, nodes, new Map());
-  return nodes.size > 0;
+  return hasGraphValue(rows);
 }
 
 const toEdge = (edge: Edge): EdgeInput => ({
@@ -37,6 +27,7 @@ export function MiniGraph({ rows, onOpen }: { rows: unknown[][]; onOpen: (id: st
   const open = useRef(onOpen);
   open.current = onOpen;
   const theme = useThemeVersion();
+  const collected = useMemo(() => collectGraph(rows), [rows]);
 
   useEffect(() => {
     if (!canvas.current) return;
@@ -57,9 +48,8 @@ export function MiniGraph({ rows, onOpen }: { rows: unknown[][]; onOpen: (id: st
   }, [theme]);
 
   useEffect(() => {
-    const nodes = new Map<string, Node>();
-    const edges = new Map<string, Edge>();
-    collect(rows, nodes, edges);
+    const nodes = collected.nodes;
+    const edges = new Map(collected.edges);
     const drawn: NodeInput[] = [...nodes.values()].map((node) => ({
       id: node.id,
       name: displayName(node),
@@ -83,7 +73,18 @@ export function MiniGraph({ rows, onOpen }: { rows: unknown[][]; onOpen: (id: st
     return () => {
       alive = false;
     };
-  }, [rows, client, namespace]);
+  }, [collected, client, namespace]);
 
-  return <canvas className="mini-graph" ref={canvas} title="Drag nodes to move them · double-click to open one" />;
+  const first = collected.nodes.keys().next().value as string | undefined;
+  return (
+    <div className="mini-graph-wrap">
+      {collected.totalNodes > MAX_DRAWN && (
+        <div className="mini-graph-limit">
+          {MAX_DRAWN.toLocaleString()} of {collected.totalNodes.toLocaleString()} nodes drawn ·{" "}
+          <button className="link-button" onClick={() => go("graph", first)}>Open them in the Graph view</button>
+        </div>
+      )}
+      <canvas className="mini-graph" ref={canvas} title="Drag nodes to move them · double-click to open one" />
+    </div>
+  );
 }

@@ -52,6 +52,17 @@ cd desktop && GRAFENO_BIN=/path/to/grafeno cargo test
 
 The desktop app's tests run against a real engine binary.
 
+## Releases
+
+Grafeno Studio and Grafeno Desktop are released together, apart from the
+engine, by tags `desktop-v<version>` (`.github/workflows/release.yml`):
+the desktop installers for Windows and Linux and the Studio's web build.
+What each version changes, and which engines it works with, is in
+[CHANGELOG.md](CHANGELOG.md). `.github/workflows/installers.yml` installs
+the desktop app on clean machines, alone and beside the engine:
+`desktop/packaging/test-install.sh` does it in Debian and Fedora
+containers.
+
 ## History
 
 The Studio and the desktop app were part of the engine's repository up to

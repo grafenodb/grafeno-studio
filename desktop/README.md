@@ -33,6 +33,14 @@ act on the focused window. Launching the app with a database path
 (`grafeno-desktop notes.redb`) opens it; launching it again while it runs
 opens the new path in the focused window.
 
+## Engines it works with
+
+Grafeno Desktop 0.2.0 works with Grafeno engines of HTTP API version 1,
+from engine 0.1.0; it checks each engine on connecting (`GET /v1/about`)
+and hides what an engine lacks. Opening database files needs an installed
+engine 0.1.0 or later (`grafeno serve --stop-with-stdin`, `grafeno
+restore`). Each version's engines are listed in [CHANGELOG.md](../CHANGELOG.md).
+
 ## Finding the engine
 
 In order: `GRAFENO_BIN`; `grafeno` on the `PATH`; where the engine's

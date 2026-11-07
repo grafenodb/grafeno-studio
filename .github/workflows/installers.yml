@@ -1,0 +1,108 @@
+# Grafeno Desktop installed on clean machines, alone and beside the Grafeno
+# engine (engine phase 15.5): the desktop package brings no service and no
+# engine; installing, upgrading and removing either leaves the other, and
+# the engine's data, untouched. The engine is built from its repository.
+name: Installers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "desktop/**"
+      - "studio/**"
+      - ".github/workflows/installers.yml"
+  pull_request:
+    paths:
+      - "desktop/**"
+      - "studio/**"
+      - ".github/workflows/installers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux (Debian, Fedora)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Seerendo/grafeno
+          path: engine
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the desktop's .deb and .rpm
+        run: docker buildx build -f desktop/packaging/Dockerfile --output dist/desktop .
+      - name: Build the engine's packages (x86_64)
+        run: |
+          docker buildx build -f engine/packaging/linux/Dockerfile \
+            --build-arg TARGETS=x86_64-unknown-linux-musl --output dist/engine engine
+      - name: Install them side by side in clean containers
+        run: desktop/packaging/test-install.sh dist/desktop dist/engine debian:12 fedora:42
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Seerendo/grafeno
+          path: engine
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build the desktop's setup
+        shell: pwsh
+        run: |
+          npm ci --prefix studio --no-audit --no-fund
+          npm ci --prefix desktop --no-audit --no-fund
+          Set-Location desktop
+          npx tauri build --bundles nsis
+      - name: Build the engine's setup
+        shell: pwsh
+        run: |
+          cargo build --release --locked -p grafeno-server --manifest-path engine/Cargo.toml
+          choco install innosetup --no-progress -y
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Q "/DAppVersion=0.0.0" engine\packaging\windows\grafeno.iss
+      - name: The desktop alone installs no service and no engine
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem desktop\target\release\bundle\nsis\*-setup.exe | Select-Object -First 1
+          Start-Process $setup.FullName -Wait -ArgumentList '/S'
+          $dir = "$env:LOCALAPPDATA\Grafeno Desktop"
+          if (-not (Test-Path "$dir\grafeno-desktop.exe")) { throw "the app is not in $dir" }
+          if (Get-ChildItem $dir -Recurse -Filter 'grafeno.exe') { throw "the desktop installed an engine" }
+          if (Get-Service Grafeno -ErrorAction SilentlyContinue) { throw "the desktop installed a service" }
+      - name: The engine beside it, then removing the desktop leaves the engine and its data
+        shell: pwsh
+        run: |
+          Start-Process engine\dist\grafeno-0.0.0-windows-x64-setup.exe -Wait -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/DATADIR=C:\GrafenoData', '/TASKS=service,path'
+          if ((Get-Service Grafeno).Status -ne 'Running') { throw "the engine's service is not running" }
+          foreach ($i in 1..50) { try { Invoke-RestMethod http://127.0.0.1:7810/health | Out-Null; break } catch { Start-Sleep -Milliseconds 200 } }
+          $token = & "C:\Program Files\Grafeno\grafeno.exe" config token
+          Invoke-RestMethod http://127.0.0.1:7810/v1/notes/nodes -Method Post -Headers @{ Authorization = "Bearer $token" } -ContentType 'application/json' -Body '{"labels":["Note"],"text":"kept"}' | Out-Null
+          Start-Process "$env:LOCALAPPDATA\Grafeno Desktop\uninstall.exe" -Wait -ArgumentList '/S'
+          foreach ($i in 1..20) { if (-not (Test-Path "$env:LOCALAPPDATA\Grafeno Desktop\grafeno-desktop.exe")) { break }; Start-Sleep -Milliseconds 500 }
+          if (Test-Path "$env:LOCALAPPDATA\Grafeno Desktop\grafeno-desktop.exe") { throw "the desktop was not removed" }
+          if ((Get-Service Grafeno).Status -ne 'Running') { throw "removing the desktop stopped the engine" }
+          $found = Invoke-RestMethod http://127.0.0.1:7810/v1/notes/search/text -Method Post -Headers @{ Authorization = "Bearer $token" } -ContentType 'application/json' -Body '{"query":"kept"}'
+          if (@($found).Count -lt 1) { throw "the engine's data changed" }
+      - name: Installing the desktop again, then removing the engine, leaves the desktop
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem desktop\target\release\bundle\nsis\*-setup.exe | Select-Object -First 1
+          Start-Process $setup.FullName -Wait -ArgumentList '/S'
+          if ((Get-Service Grafeno).Status -ne 'Running') { throw "installing the desktop disturbed the engine" }
+          Start-Process "C:\Program Files\Grafeno\unins000.exe" -Wait -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
+          foreach ($i in 1..30) { if (-not (Get-Service Grafeno -ErrorAction SilentlyContinue)) { break }; Start-Sleep -Milliseconds 500 }
+          if (-not (Test-Path "$env:LOCALAPPDATA\Grafeno Desktop\grafeno-desktop.exe")) { throw "removing the engine removed the desktop" }
+          if (-not (Test-Path "C:\GrafenoData\grafeno.redb")) { throw "removing the engine removed its data" }

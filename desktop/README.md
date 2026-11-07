@@ -135,7 +135,7 @@ GRAFENO_BIN=/usr/bin/grafeno dbus-run-session -- xvfb-run -a -s "-screen 0 1600x
 ## Tauri or Electron
 
 Measured on one laptop (Windows 11, WebView2), with the same Studio build
-(0.9 MB), recorded in the engine's `DESIGN.md` (phase 15.4): the Tauri
+(0.9 MB), recorded in the engine's [phase 15](https://github.com/grafenodb/grafeno/blob/main/docs/phases/phase-15-engine-and-interface-apart.md#154-the-desktop-application-without-an-engine-done) (15.4): the Tauri
 installer is 3.1 MB (NSIS) or 4.4 MB (MSI), where Electron's runtime alone
 is 110 MB compressed; memory is about the same (WebView2 is Chromium too:
 about 375 MB of working set for Tauri's window and its WebView2 processes,

@@ -92,6 +92,16 @@ and the same script in the desktop app does the same.
 
 ### Phase 2: the layout in a Web Worker
 
+Status: implemented (2026-11-07). `layout.worker.ts` owns the d3-force
+simulation and publishes indexed positions in transferable `Float32Array`
+buffers at most every 16 ms. `GraphEngine` keeps drawing and input on the
+main thread and forwards data, drag, pin, reheat and stop messages without
+changing its public commands. Worker load errors and worker-less test hosts
+use the same `LayoutSimulation` on the main thread. The production build
+emits a separate worker asset; a Tauri debug build with that asset completes
+successfully on Windows. Runtime WebView2 measurements remain to be recorded
+below.
+
 - Move the d3-force simulation into a worker (`studio/src/graph/layout.worker.ts`;
   Vite bundles workers with `new Worker(new URL(...), { type: "module" })`).
   The main thread keeps only drawing and input.

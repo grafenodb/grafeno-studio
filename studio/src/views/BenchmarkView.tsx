@@ -16,7 +16,7 @@ function integer(value: string | null, fallback: number, maximum: number): numbe
   return Number.isFinite(parsed) ? Math.max(0, Math.min(maximum, Math.floor(parsed))) : fallback;
 }
 
-function parameters(): { nodes: number; edges: number; seed: number; shape: SyntheticShape } {
+function parameters(): { nodes: number; edges: number; seed: number; shape: SyntheticShape; auto: boolean } {
   const query = new URLSearchParams(window.location.hash.split("?")[1] ?? "");
   const nodes = integer(query.get("nodes"), 10_000, 200_000);
   const shape = query.get("shape");
@@ -25,6 +25,7 @@ function parameters(): { nodes: number; edges: number; seed: number; shape: Synt
     edges: integer(query.get("edges"), nodes * 3, 600_000),
     seed: integer(query.get("seed"), 1, 0xffffffff),
     shape: shape === "random" || shape === "grid" ? shape : "scale-free",
+    auto: query.get("auto") === "1",
   };
 }
 
@@ -41,6 +42,7 @@ export function BenchmarkView() {
   const first = useRef(true);
   const [metrics, setMetrics] = useState(initialMetrics);
   const [panning, setPanning] = useState(false);
+  const [layout, setLayout] = useState<"starting" | "worker" | "main">("starting");
 
   useEffect(() => {
     if (!canvas.current) return;
@@ -63,6 +65,7 @@ export function BenchmarkView() {
         open: () => undefined,
         menu: () => undefined,
         connect: () => undefined,
+        layout: setLayout,
         frame: (at) => {
           frames.current.push(at);
           if (first.current) {
@@ -103,6 +106,11 @@ export function BenchmarkView() {
   };
 
   useEffect(() => {
+    if (options.auto && metrics.firstFrame !== null) samplePan();
+    // A first-frame transition runs this once; the pan result does not.
+  }, [metrics.firstFrame, options.auto]);
+
+  useEffect(() => {
     if (metrics.firstFrame === null) return;
     console.table([
       {
@@ -114,9 +122,10 @@ export function BenchmarkView() {
         "pan fps": metrics.fps?.toFixed(1) ?? "not sampled",
         "long tasks": metrics.longTasks,
         "longest task (ms)": metrics.longestTask.toFixed(1),
+        layout,
       },
     ]);
-  }, [metrics, options]);
+  }, [layout, metrics, options]);
 
   return (
     <div className="benchmark-page">
@@ -134,6 +143,7 @@ export function BenchmarkView() {
           <div><dt>Pan rate</dt><dd>{metrics.fps === null ? "Not sampled" : `${metrics.fps.toFixed(1)} fps`}</dd></div>
           <div><dt>Long tasks</dt><dd>{metrics.longTasks}</dd></div>
           <div><dt>Longest</dt><dd>{metrics.longestTask.toFixed(1)} ms</dd></div>
+          <div><dt>Layout</dt><dd>{layout}</dd></div>
         </dl>
         <button className="primary" disabled={panning || metrics.firstFrame === null} onClick={samplePan}>
           {panning ? "Sampling for 3 seconds…" : "Run pan sample"}

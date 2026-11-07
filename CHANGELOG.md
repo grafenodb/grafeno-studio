@@ -41,6 +41,9 @@ engine's repository (engine phase 15).
 - **Large script results stay responsive**: result graphs draw at most the
   2,000 most connected nodes and say how many were omitted; tables over 300
   rows keep only their visible window in the DOM.
+- **Layout off the main thread**: graph physics runs in a module Web Worker
+  and streams transferable position buffers while drawing and input remain
+  responsive; unsupported hosts retain an automatic main-thread fallback.
 - **Installers**: Windows (`.exe`, `.msi`, for the current user), Linux
   (`.deb`, `.rpm`, `.AppImage`); none carries an engine or installs a
   service. The Studio's web build as a `.zip`, for a web server.

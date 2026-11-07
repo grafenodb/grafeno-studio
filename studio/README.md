@@ -69,8 +69,15 @@ to a `grafeno serve` on `127.0.0.1:7810` (start one first, for example
 
 The development-only graph benchmark needs no engine. Open
 `/#/bench?nodes=10000` and optionally set `edges`, `shape` (`random`,
-`scale-free` or `grid`) and `seed`. It reports time to first frame, pan
-frame rate and main-thread long tasks on screen and in `console.table`.
+`scale-free` or `grid`), `seed`, and `auto=1` to run the pan sample. It
+reports time to first frame, pan
+frame rate, main-thread long tasks and the active layout mode on screen and
+in `console.table`.
+
+Graph layout runs d3-force in a module Web Worker, while the main thread
+draws and handles input. Positions arrive at most once per frame in a
+transferable `Float32Array`. Hosts without module workers automatically use
+the same simulation on the main thread.
 
 ```bash
 npm run build

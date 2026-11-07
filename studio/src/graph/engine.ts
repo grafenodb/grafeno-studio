@@ -5,17 +5,7 @@
 // it to another. The engine knows nothing of Grafeno: the view gives it
 // nodes and edges and listens to what the user does.
 
-import {
-  type Simulation,
-  type SimulationLinkDatum,
-  type SimulationNodeDatum,
-  forceCollide,
-  forceLink,
-  forceManyBody,
-  forceSimulation,
-  forceX,
-  forceY,
-} from "d3-force";
+import { GraphLayout, type LayoutMode } from "./layout.ts";
 
 export interface NodeInput {
   id: string;
@@ -38,11 +28,15 @@ export interface EdgeInput {
   ended?: boolean;
 }
 
-export interface GraphNode extends SimulationNodeDatum, NodeInput {
+export interface GraphNode extends NodeInput {
   pinned: boolean;
+  x?: number;
+  y?: number;
+  fx?: number | null;
+  fy?: number | null;
 }
 
-export interface GraphEdge extends SimulationLinkDatum<GraphNode>, Omit<EdgeInput, "from" | "to"> {
+export interface GraphEdge extends Omit<EdgeInput, "from" | "to"> {
   source: GraphNode;
   target: GraphNode;
   /** Offset of the curve's control point, for parallel edges. */
@@ -64,6 +58,8 @@ export interface Events {
   view?: () => void;
   /** A frame was painted; used by the development benchmark. */
   frame?: (at: number) => void;
+  /** Reports whether layout runs in the worker or the fallback. */
+  layout?: (mode: LayoutMode) => void;
 }
 
 export interface Palette {
@@ -128,7 +124,7 @@ export class GraphEngine {
   private edges: GraphEdge[] = [];
   private byId = new Map<string, GraphNode>();
   private neighbors = new Map<string, Set<string>>();
-  private readonly sim: Simulation<GraphNode, GraphEdge>;
+  private readonly layout: GraphLayout;
   private transform: View = { x: 0, y: 0, k: 1 };
   private width = 0;
   private height = 0;
@@ -143,6 +139,7 @@ export class GraphEngine {
   private minimap: HTMLCanvasElement | null = null;
   private insets: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
   private fitted = false;
+  private pendingFit = false;
   private readonly observer: ResizeObserver;
   private readonly cleanup: (() => void)[] = [];
 
@@ -157,20 +154,23 @@ export class GraphEngine {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("no 2D canvas");
     this.ctx = ctx;
-    this.sim = forceSimulation<GraphNode, GraphEdge>()
-      .force(
-        "link",
-        forceLink<GraphNode, GraphEdge>()
-          .id((node) => node.id)
-          .distance((edge) => 46 + edge.source.size + edge.target.size)
-          .strength((edge) => 0.7 / Math.min(this.degree(edge.source.id), this.degree(edge.target.id))),
-      )
-      .force("charge", forceManyBody<GraphNode>().strength((node) => -180 - node.size * 8).distanceMax(700))
-      .force("collide", forceCollide<GraphNode>((node) => node.size + 8).iterations(2))
-      .force("x", forceX<GraphNode>(0).strength(0.035))
-      .force("y", forceY<GraphNode>(0).strength(0.035))
-      .alphaDecay(0.028)
-      .on("tick", () => this.request());
+    this.layout = new GraphLayout(
+      (positions) => {
+        if (positions.length !== this.nodes.length * 2) return;
+        const dragged = this.drag.kind === "nodes" && this.drag.moved ? new Set(this.drag.ids) : null;
+        for (let index = 0; index < this.nodes.length; index++) {
+          if (dragged?.has(this.nodes[index].id)) continue;
+          this.nodes[index].x = positions[index * 2];
+          this.nodes[index].y = positions[index * 2 + 1];
+        }
+        if (this.pendingFit) {
+          this.pendingFit = false;
+          this.fit(false);
+        }
+        this.request();
+      },
+      (mode) => this.events.layout?.(mode),
+    );
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(canvas);
     this.listen();
@@ -234,15 +234,15 @@ export class GraphEngine {
     }
     for (const id of [...this.selected]) if (!known.has(id)) this.selected.delete(id);
     if (this.selectedEdge && !this.edges.some((edge) => edge.id === this.selectedEdge)) this.selectedEdge = null;
-    this.sim.nodes(this.nodes);
-    (this.sim.force("link") as ReturnType<typeof forceLink<GraphNode, GraphEdge>>).links(this.edges);
     const changed = fresh.length > 0 || previous.size !== known.size;
-    if (changed) this.sim.alpha(fresh.length === this.nodes.length ? 1 : 0.6).restart();
+    this.layout.setData(
+      this.nodes.map((node) => ({ id: node.id, size: node.size, x: node.x ?? 0, y: node.y ?? 0, pinned: node.pinned })),
+      this.edges.map((edge) => ({ from: edge.source.id, to: edge.target.id })),
+      changed ? (fresh.length === this.nodes.length ? 1 : 0.6) : 0,
+    );
     if (!this.fitted && this.nodes.length > 0) {
-      // Let the first layout spread out, then frame it.
       this.fitted = true;
-      for (let i = 0; i < 120; i++) this.sim.tick();
-      this.fit(false);
+      this.pendingFit = true;
     }
     this.request();
   }
@@ -250,8 +250,11 @@ export class GraphEngine {
   /** Changes colors and sizes without moving anything. */
   restyle(update: (node: GraphNode) => void): void {
     for (const node of this.nodes) update(node);
-    (this.sim.force("collide") as ReturnType<typeof forceCollide<GraphNode>>).radius((node) => node.size + 8);
-    this.sim.alpha(Math.max(this.sim.alpha(), 0.15)).restart();
+    this.layout.setData(
+      this.nodes.map((node) => ({ id: node.id, size: node.size, x: node.x ?? 0, y: node.y ?? 0, pinned: node.pinned })),
+      this.edges.map((edge) => ({ from: edge.source.id, to: edge.target.id })),
+      0.15,
+    );
     this.request();
   }
 
@@ -303,14 +306,16 @@ export class GraphEngine {
   }
 
   pin(ids: string[], pinned: boolean): void {
+    const points: { id: string; x: number; y: number; pinned: boolean }[] = [];
     for (const id of ids) {
       const node = this.byId.get(id);
       if (!node) continue;
       node.pinned = pinned;
       node.fx = pinned ? node.x : null;
       node.fy = pinned ? node.y : null;
+      points.push({ id, x: node.x ?? 0, y: node.y ?? 0, pinned });
     }
-    if (!pinned) this.sim.alpha(0.3).restart();
+    this.layout.pin(points);
     this.request();
   }
 
@@ -327,7 +332,7 @@ export class GraphEngine {
 
   /** Lays the graph out again from the current places. */
   reheat(): void {
-    this.sim.alpha(1).restart();
+    this.layout.reheat();
   }
 
   /** Frames every node (or the given ones) in the free area. */
@@ -377,17 +382,13 @@ export class GraphEngine {
   }
 
   destroy(): void {
-    this.sim.stop();
+    this.layout.stop();
     cancelAnimationFrame(this.frame);
     this.observer.disconnect();
     for (const undo of this.cleanup) undo();
   }
 
   // ------------------------------------------------------------ geometry
-
-  private degree(id: string): number {
-    return Math.max(1, this.neighbors.get(id)?.size ?? 1);
-  }
 
   private toWorld(point: Point): Point {
     return { x: (point.x - this.transform.x) / this.transform.k, y: (point.y - this.transform.y) / this.transform.k };
@@ -601,8 +602,8 @@ export class GraphEngine {
         if (!drag.moved && Math.hypot(dx, dy) * this.transform.k < CLICK) return;
         if (!drag.moved) {
           drag.moved = true;
-          this.sim.alphaTarget(0.25).restart();
         }
+        const points: { id: string; x: number; y: number }[] = [];
         for (const id of drag.ids) {
           const node = this.byId.get(id);
           const origin = drag.origins.get(id);
@@ -612,7 +613,9 @@ export class GraphEngine {
           // Follow the pointer at once, not at the next simulation tick.
           node.x = node.fx;
           node.y = node.fy;
+          points.push({ id, x: node.x, y: node.y });
         }
+        this.layout.drag(points, true);
         canvas.style.cursor = "grabbing";
         this.request();
       } else if (drag.kind === "lasso") {
@@ -646,11 +649,15 @@ export class GraphEngine {
           this.clickAt(point, drag.additive);
         } else {
           // Left where the user put them.
+          const points: { id: string; x: number; y: number; pinned: boolean }[] = [];
           for (const id of drag.ids) {
             const node = this.byId.get(id);
-            if (node) node.pinned = true;
+            if (!node) continue;
+            node.pinned = true;
+            points.push({ id, x: node.x ?? 0, y: node.y ?? 0, pinned: true });
           }
-          this.sim.alphaTarget(0);
+          this.layout.drag(points, false);
+          this.layout.pin(points);
         }
       } else if (drag.kind === "lasso") {
         const caught = this.nodes.filter((node) => inside(this.toScreen({ x: node.x ?? 0, y: node.y ?? 0 }), drag.points)).map((node) => node.id);

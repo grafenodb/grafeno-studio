@@ -11,7 +11,7 @@ export interface VirtualWindow {
 /** Calculates the small row window that should exist in the DOM. */
 export function virtualWindow(scrollTop: number, viewportHeight: number, rows: number, overscan = 8): VirtualWindow {
   const visible = Math.max(1, Math.ceil(viewportHeight / RESULT_ROW_HEIGHT));
-  const start = Math.max(0, Math.floor(scrollTop / RESULT_ROW_HEIGHT) - overscan);
+  const start = Math.min(Math.max(0, Math.floor(scrollTop / RESULT_ROW_HEIGHT) - overscan), Math.max(0, rows - visible));
   const end = Math.min(rows, start + visible + overscan * 2);
   return {
     start,

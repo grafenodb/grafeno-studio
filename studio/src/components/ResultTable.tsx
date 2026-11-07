@@ -1,4 +1,7 @@
+import { useEffect, useRef, useState } from "react";
+
 import { displayName, go, labelColor } from "../api.ts";
+import { VIRTUALIZE_AFTER, virtualWindow } from "../graph/virtual-table.ts";
 
 type Json = unknown;
 
@@ -41,10 +44,32 @@ export function Cell({ value }: { value: Json }) {
 }
 
 export function ResultTable({ columns, rows }: { columns: string[]; rows: Json[][] }) {
+  const wrap = useRef<HTMLDivElement>(null);
+  const [viewport, setViewport] = useState({ top: 0, height: 600 });
+  const virtual = rows.length > VIRTUALIZE_AFTER;
+  useEffect(() => {
+    const element = wrap.current;
+    if (!element || !virtual) return;
+    const update = () => setViewport((value) => ({ ...value, height: element.clientHeight || 600 }));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [virtual]);
+  useEffect(() => {
+    if (!virtual || !wrap.current) return;
+    wrap.current.scrollTop = 0;
+    setViewport((value) => ({ ...value, top: 0 }));
+  }, [rows, virtual]);
   if (columns.length === 0) return null;
+  const window = virtual ? virtualWindow(viewport.top, viewport.height, rows.length) : { start: 0, end: rows.length, before: 0, after: 0 };
   return (
-    <div className="table-wrap">
-      <table>
+    <div
+      className={virtual ? "table-wrap virtual-table-wrap" : "table-wrap"}
+      ref={wrap}
+      onScroll={virtual ? (event) => setViewport((value) => ({ ...value, top: event.currentTarget.scrollTop })) : undefined}
+    >
+      <table className={virtual ? "virtual-table" : undefined}>
         <thead>
           <tr>
             {columns.map((column) => (
@@ -53,7 +78,10 @@ export function ResultTable({ columns, rows }: { columns: string[]; rows: Json[]
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
+          {window.before > 0 && <tr className="virtual-spacer" aria-hidden="true"><td colSpan={Math.max(1, columns.length)} style={{ height: window.before }} /></tr>}
+          {rows.slice(window.start, window.end).map((row, offset) => {
+            const index = window.start + offset;
+            return (
             <tr key={index}>
               {row.map((value, column) => (
                 <td key={column}>
@@ -61,7 +89,9 @@ export function ResultTable({ columns, rows }: { columns: string[]; rows: Json[]
                 </td>
               ))}
             </tr>
-          ))}
+            );
+          })}
+          {window.after > 0 && <tr className="virtual-spacer" aria-hidden="true"><td colSpan={Math.max(1, columns.length)} style={{ height: window.after }} /></tr>}
         </tbody>
       </table>
     </div>

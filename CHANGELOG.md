@@ -38,6 +38,9 @@ engine's repository (engine phase 15).
 - **Graph benchmark**: a development-only, deterministic 1k–50k-node
   benchmark records time to first frame, pan frame rate and main-thread
   long tasks before the large-graph renderer changes.
+- **Large script results stay responsive**: result graphs draw at most the
+  2,000 most connected nodes and say how many were omitted; tables over 300
+  rows keep only their visible window in the DOM.
 - **Installers**: Windows (`.exe`, `.msi`, for the current user), Linux
   (`.deb`, `.rpm`, `.AppImage`); none carries an engine or installs a
   service. The Studio's web build as a `.zip`, for a web server.

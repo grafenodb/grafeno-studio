@@ -27,7 +27,7 @@ function isEdge(value: object): value is Edge {
   );
 }
 
-function walk(value: unknown, visit: (item: object) => void): void {
+function walk(value: unknown, visit: (item: object) => boolean | void): boolean {
   const stack = [value];
   const seen = new WeakSet<object>();
   while (stack.length > 0) {
@@ -35,21 +35,18 @@ function walk(value: unknown, visit: (item: object) => void): void {
     if (!item || typeof item !== "object" || seen.has(item)) continue;
     seen.add(item);
     if (isNode(item) || isEdge(item)) {
-      visit(item);
+      if (visit(item)) return true;
       continue;
     }
     const nested = Array.isArray(item) ? item : Object.values(item);
     for (let index = nested.length - 1; index >= 0; index--) stack.push(nested[index]);
   }
+  return false;
 }
 
 /** Finds a node without walking the remainder of a large result. */
 export function hasGraphValue(value: unknown): boolean {
-  let found = false;
-  walk(value, (item) => {
-    if (isNode(item)) found = true;
-  });
-  return found;
+  return walk(value, (item) => isNode(item));
 }
 
 /**

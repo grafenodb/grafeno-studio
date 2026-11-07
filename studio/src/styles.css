@@ -2072,6 +2072,28 @@ dl.facts dd {
   touch-action: none;
 }
 
+.mini-graph-wrap {
+  position: absolute;
+  inset: 0;
+}
+
+.mini-graph-limit {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 50%;
+  translate: -50% 0;
+  max-width: calc(100% - 24px);
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-solid) 92%, transparent);
+  box-shadow: var(--shadow-sm);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .graph:focus {
   outline: none;
 }
@@ -2539,6 +2561,30 @@ button.schema-item {
   border-radius: 0;
   min-height: 100%;
   background: transparent;
+}
+
+.result-body .virtual-table-wrap {
+  height: 100%;
+  min-height: 0;
+}
+
+.virtual-table {
+  table-layout: fixed;
+}
+
+.virtual-table tbody tr:not(.virtual-spacer) {
+  height: 38px;
+}
+
+.virtual-table tbody tr:not(.virtual-spacer) td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.virtual-spacer td {
+  padding: 0;
+  border: 0;
 }
 
 .json-view {

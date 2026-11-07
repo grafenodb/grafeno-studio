@@ -68,6 +68,13 @@ Done when: the numbers of the table above can be measured repeatably.
 
 ### Phase 1: limits where results become graphs
 
+Status: implemented (2026-11-07). Script graphs retain the 2,000 nodes
+with highest result degree and only their internal edges, display the full
+unique-node count, and link to an incremental Graph view. Collection is
+iterative and retains full objects only for selected nodes. Result tables
+virtualize after 300 rows. Covered by `graph-result.test.mjs` and
+`virtual-table.test.mjs`.
+
 - `MiniGraph`: draw at most `MAX_DRAWN = 2,000` nodes (a constant, tested),
   the edges among the drawn ones, and say so above the canvas: "2,000 of
   10,412 nodes drawn · Open them in the Graph view" (which expands step by

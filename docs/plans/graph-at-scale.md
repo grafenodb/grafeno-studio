@@ -120,6 +120,18 @@ task over 50 ms), in the browser and the desktop app.
 
 ### Phase 3: a WebGL2 renderer for large graphs
 
+Status: implemented (2026-11-07), with performance measurements pending.
+A purpose-built renderer was chosen instead of sigma.js or cosmos.gl: it
+adds no dependency, keeps `GraphEngine`'s interaction contract, and adds
+about 18.6 kB to the minified Studio bundle (762.8 kB to 781.4 kB before
+compression). Above 3,000 nodes it draws instanced edge and hex-node quads
+from a shared floating-point position texture. A second framebuffer encodes
+edge and node IDs for GPU picking; Canvas 2D above it keeps labels, selected
+neighborhoods, dragging, lasso and connection overlays. Small graphs remain
+entirely on Canvas, and a missing or lost WebGL2 context falls back to it.
+The Windows Tauri debug build packages both the worker and renderer. Live
+50k/150k FPS and Linux WebKitGTK checks remain to be recorded below.
+
 - Draw nodes and edges with WebGL2 (instanced quads for nodes, lines for
   edges) when a graph has more than about 3,000 nodes; keep Canvas 2D below
   that (it looks the same as today and stays simple).

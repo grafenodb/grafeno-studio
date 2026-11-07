@@ -79,6 +79,14 @@ draws and handles input. Positions arrive at most once per frame in a
 transferable `Float32Array`. Hosts without module workers automatically use
 the same simulation on the main thread.
 
+Graphs through 3,000 nodes keep the original Canvas 2D renderer. Larger
+graphs use the bundled WebGL2 renderer: instanced node and edge quads read a
+shared position texture, while labels, selection detail and drag overlays
+remain on the 2D canvas above it. A GPU color-picking pass preserves node and
+edge interaction. If WebGL2 is unavailable or its context is lost, the graph
+falls back to Canvas automatically. The hidden `#/bench` diagnostic is also
+available in Desktop builds.
+
 ```bash
 npm run build
 ```

@@ -8,7 +8,7 @@ import { App } from "./App.tsx";
 import { BenchmarkView } from "./views/BenchmarkView.tsx";
 import "./styles.css";
 
-const benchmark = import.meta.env.DEV && /^#\/?bench(?:\?|$)/.test(window.location.hash);
+const benchmark = /^#\/?bench(?:\?|$)/.test(window.location.hash) && (import.meta.env.DEV || "__TAURI_INTERNALS__" in window);
 
 createRoot(document.getElementById("root")!).render(
   benchmark ? (

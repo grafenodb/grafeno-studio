@@ -44,6 +44,9 @@ engine's repository (engine phase 15).
 - **Layout off the main thread**: graph physics runs in a module Web Worker
   and streams transferable position buffers while drawing and input remain
   responsive; unsupported hosts retain an automatic main-thread fallback.
+- **Large graphs use WebGL2**: above 3,000 nodes, instanced nodes and edges
+  render on the GPU with color picking for interaction; small graphs retain
+  their existing Canvas look, and Canvas remains the automatic fallback.
 - **Installers**: Windows (`.exe`, `.msi`, for the current user), Linux
   (`.deb`, `.rpm`, `.AppImage`); none carries an engine or installs a
   service. The Studio's web build as a `.zip`, for a web server.

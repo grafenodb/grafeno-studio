@@ -2063,13 +2063,18 @@ dl.facts dd {
 
 /* Canvases fill their box; the engine sizes their pixels. */
 .graph-canvas,
-.mini-graph {
+.mini-graph,
+.graph-webgl {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   display: block;
   touch-action: none;
+}
+
+.graph-webgl {
+  pointer-events: none;
 }
 
 .mini-graph-wrap {

@@ -43,6 +43,7 @@ export function BenchmarkView() {
   const [metrics, setMetrics] = useState(initialMetrics);
   const [panning, setPanning] = useState(false);
   const [layout, setLayout] = useState<"starting" | "worker" | "main">("starting");
+  const [renderer, setRenderer] = useState<"starting" | "canvas2d" | "webgl2">("starting");
 
   useEffect(() => {
     if (!canvas.current) return;
@@ -66,6 +67,7 @@ export function BenchmarkView() {
         menu: () => undefined,
         connect: () => undefined,
         layout: setLayout,
+        renderer: setRenderer,
         frame: (at) => {
           frames.current.push(at);
           if (first.current) {
@@ -123,9 +125,10 @@ export function BenchmarkView() {
         "long tasks": metrics.longTasks,
         "longest task (ms)": metrics.longestTask.toFixed(1),
         layout,
+        renderer,
       },
     ]);
-  }, [layout, metrics, options]);
+  }, [layout, metrics, options, renderer]);
 
   return (
     <div className="benchmark-page">
@@ -144,6 +147,7 @@ export function BenchmarkView() {
           <div><dt>Long tasks</dt><dd>{metrics.longTasks}</dd></div>
           <div><dt>Longest</dt><dd>{metrics.longestTask.toFixed(1)} ms</dd></div>
           <div><dt>Layout</dt><dd>{layout}</dd></div>
+          <div><dt>Renderer</dt><dd>{renderer}</dd></div>
         </dl>
         <button className="primary" disabled={panning || metrics.firstFrame === null} onClick={samplePan}>
           {panning ? "Sampling for 3 seconds…" : "Run pan sample"}

@@ -2,7 +2,7 @@
 
 Grafeno Studio (the interface) and Grafeno Desktop (the Studio in native
 windows) are one product with one version, released apart from the
-Grafeno engine and tagged `desktop-v<version>`. A version's section here
+Grafeno engine and tagged `v<version>`. A version's section here
 is its release's notes; the release workflow refuses a tag whose version
 has no section, or whose version differs from `desktop/Cargo.toml`,
 `desktop/tauri.conf.json` and `studio/package.json`.
@@ -11,7 +11,7 @@ Each version says which engines it works with. It speaks to engines only
 through their HTTP API, checks each one on connecting (`GET /v1/about`),
 and hides what an engine lacks.
 
-## 0.2.0 (not released yet)
+## 0.2.0 (2026-11-07)
 
 The first release on its own: the interface and the desktop app left the
 engine's repository (engine phase 15).

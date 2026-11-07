@@ -55,7 +55,7 @@ The desktop app's tests run against a real engine binary.
 ## Releases
 
 Grafeno Studio and Grafeno Desktop are released together, apart from the
-engine, by tags `desktop-v<version>` (`.github/workflows/release.yml`):
+engine, by tags `v<version>` (`.github/workflows/release.yml`):
 the desktop installers for Windows and Linux and the Studio's web build.
 What each version changes, and which engines it works with, is in
 [CHANGELOG.md](CHANGELOG.md). `.github/workflows/installers.yml` installs

@@ -1,5 +1,5 @@
 # Releases Grafeno Studio and Grafeno Desktop when a tag like
-# desktop-v0.2.0 is pushed: the desktop installers for Windows (.exe, .msi)
+# v0.2.0 is pushed: the desktop installers for Windows (.exe, .msi)
 # and Linux (.deb, .rpm, .AppImage), the Studio's web build (.zip), each
 # with a .sha256 (and a .minisig when the minisign key is set). None
 # carries an engine: the engine is released from its own repository.
@@ -12,7 +12,7 @@ name: release
 
 on:
   push:
-    tags: ["desktop-v*"]
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -34,7 +34,7 @@ jobs:
           echo "Cargo $cargo, tauri.conf $tauri, Studio $studio"
           test "$cargo" = "$tauri" && test "$cargo" = "$studio"
           if [ "${GITHUB_REF_TYPE}" = tag ]; then
-            test "$GITHUB_REF_NAME" = "desktop-v$cargo" || { echo "tag $GITHUB_REF_NAME, version $cargo"; exit 1; }
+            test "$GITHUB_REF_NAME" = "v$cargo" || { echo "tag $GITHUB_REF_NAME, version $cargo"; exit 1; }
           fi
           grep -q "^## $cargo" CHANGELOG.md || { echo "CHANGELOG.md has no section for $cargo"; exit 1; }
           echo "version=$cargo" >> "$GITHUB_OUTPUT"
@@ -54,6 +54,7 @@ jobs:
           npm run build --prefix studio
           mkdir -p out
           (cd studio/dist && zip -qr "../../out/grafeno-studio-web-${{ needs.check.outputs.version }}.zip" .)
+          cp "out/grafeno-studio-web-${{ needs.check.outputs.version }}.zip" out/grafeno-studio-web.zip
       - uses: actions/upload-artifact@v4
         with:
           name: studio
@@ -72,7 +73,7 @@ jobs:
       - name: Tauri's system libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev rpm
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev rpm file libfuse2 xdg-utils
       - name: Build the .deb, .rpm and .AppImage
         run: |
           npm ci --prefix studio --no-audit --no-fund
@@ -83,6 +84,11 @@ jobs:
           mkdir -p out
           cp desktop/target/release/bundle/deb/*.deb desktop/target/release/bundle/rpm/*.rpm \
              desktop/target/release/bundle/appimage/*.AppImage out/
+          # Also under names without the version, for links to the latest
+          # release (releases/latest/download/…).
+          cp desktop/target/release/bundle/deb/*.deb out/grafeno-desktop-linux-amd64.deb
+          cp desktop/target/release/bundle/rpm/*.rpm out/grafeno-desktop-linux-x86_64.rpm
+          cp desktop/target/release/bundle/appimage/*.AppImage out/grafeno-desktop-linux-x86_64.AppImage
       - uses: actions/upload-artifact@v4
         with:
           name: linux
@@ -117,6 +123,9 @@ jobs:
           }
           New-Item -ItemType Directory -Force ..\out | Out-Null
           Copy-Item target\release\bundle\nsis\*.exe, target\release\bundle\msi\*.msi ..\out\
+          # Also under names without the version, for links to the latest release.
+          Copy-Item (Get-ChildItem target\release\bundle\nsis\*.exe | Select-Object -First 1).FullName ..\out\grafeno-desktop-windows-x64-setup.exe
+          Copy-Item (Get-ChildItem target\release\bundle\msi\*.msi | Select-Object -First 1).FullName ..\out\grafeno-desktop-windows-x64.msi
       - uses: actions/upload-artifact@v4
         with:
           name: windows

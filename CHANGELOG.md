@@ -35,9 +35,9 @@ engine's repository (engine phase 15).
 - **The Studio**: checks each engine (`connect()`), refuses one with no API
   version in common, hides the views an engine lacks, and backs up through
   `GET /v1/backup`.
-- **Graph benchmark**: a development-only, deterministic 1k–50k-node
-  benchmark records time to first frame, pan frame rate and main-thread
-  long tasks before the large-graph renderer changes.
+- **Graph benchmark**: a deterministic 1k–100k+-node benchmark is available
+  in hosted Studio and Desktop builds and records time to first frame, pan
+  frame rate, main-thread long tasks and the active layout mode.
 - **Large script results stay responsive**: result graphs draw at most the
   2,000 most connected nodes and say how many were omitted; tables over 300
   rows keep only their visible window in the DOM.
@@ -50,9 +50,13 @@ engine's repository (engine phase 15).
 - **Readable detail at every zoom**: large graphs prioritize visible labels
   by degree, progressively reveal lower-priority edges, and reserve arrows
   and edge labels for close views while keeping focused items visible.
-- **Optional WebGPU layout for 100k+ nodes**: capable Desktop hosts run an
-  approximate linear-cost compute layout; missing adapters, shader failures
-  and device loss fall back automatically to the worker's d3-force layout.
+- **Optional WebGPU layout for 100k+ nodes**: capable browsers and Desktop
+  hosts run an approximate linear-cost compute layout; missing secure-context
+  support, adapters, shader failures and device loss fall back automatically
+  to the worker's d3-force layout.
+- **Web and Desktop graph parity**: both releases use the same worker,
+  WebGL2 renderer, zoom-aware detail, GPU picking and optional WebGPU paths
+  from the shared Studio build.
 - **Installers**: Windows (`.exe`, `.msi`, for the current user), Linux
   (`.deb`, `.rpm`, `.AppImage`); none carries an engine or installs a
   service. The Studio's web build as a `.zip`, for a web server.

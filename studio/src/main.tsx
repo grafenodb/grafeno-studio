@@ -5,10 +5,11 @@ import "@fontsource-variable/space-grotesk";
 import "@fontsource-variable/jetbrains-mono";
 
 import { App } from "./App.tsx";
+import { isBenchmarkRoute } from "./benchmark-route.ts";
 import { BenchmarkView } from "./views/BenchmarkView.tsx";
 import "./styles.css";
 
-const benchmark = /^#\/?bench(?:\?|$)/.test(window.location.hash) && (import.meta.env.DEV || "__TAURI_INTERNALS__" in window);
+const benchmark = isBenchmarkRoute(window.location.hash);
 
 createRoot(document.getElementById("root")!).render(
   benchmark ? (

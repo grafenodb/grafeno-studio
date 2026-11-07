@@ -129,8 +129,9 @@ from a shared floating-point position texture. A second framebuffer encodes
 edge and node IDs for GPU picking; Canvas 2D above it keeps labels, selected
 neighborhoods, dragging, lasso and connection overlays. Small graphs remain
 entirely on Canvas, and a missing or lost WebGL2 context falls back to it.
-The Windows Tauri debug build packages both the worker and renderer. Live
-50k/150k FPS and Linux WebKitGTK checks remain to be recorded below.
+Production web and Tauri builds package the same worker and renderer from
+`studio/dist`. Live 50k/150k FPS and Linux WebKitGTK checks remain to be
+recorded below.
 
 - Draw nodes and edges with WebGL2 (instanced quads for nodes, lines for
   edges) when a graph has more than about 3,000 nodes; keep Canvas 2D below
@@ -184,8 +185,10 @@ adjacency graph is packed into CSR arrays in the worker. Drag, pin, reheat and
 device-loss paths preserve the existing protocol; any unavailable API,
 adapter, device or pipeline falls back to d3-force from the latest positions.
 The WebGL2 renderer cannot share WebGPU buffers directly, so positions use the
-same transferable path as phase 2. WebView2 and fallback WebKitGTK runs remain
-to be recorded below.
+same transferable path as phase 2. Hosted browsers and Tauri use the same
+implementation; WebGPU additionally requires a secure web context and falls
+back without error when that or any hardware capability is missing. WebView2,
+browser and fallback WebKitGTK runs remain to be recorded below.
 
 - Where `navigator.gpu` exists (WebView2 on Windows; Chrome and Edge),
   run the force layout as compute shaders, for 100k+ nodes; elsewhere

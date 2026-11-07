@@ -67,7 +67,8 @@ npm run dev
 to a `grafeno serve` on `127.0.0.1:7810` (start one first, for example
 `grafeno serve --memory`), or to the server in `GRAFENO_URL`.
 
-The development-only graph benchmark needs no engine. Open
+The graph benchmark needs no engine and is available in development, hosted
+web and Desktop builds. Open
 `/#/bench?nodes=10000` and optionally set `edges`, `shape` (`random`,
 `scale-free` or `grid`), `seed`, and `auto=1` to run the pan sample. It
 reports time to first frame, pan
@@ -84,8 +85,8 @@ graphs use the bundled WebGL2 renderer: instanced node and edge quads read a
 shared position texture, while labels, selection detail and drag overlays
 remain on the 2D canvas above it. A GPU color-picking pass preserves node and
 edge interaction. If WebGL2 is unavailable or its context is lost, the graph
-falls back to Canvas automatically. The hidden `#/bench` diagnostic is also
-available in Desktop builds.
+falls back to Canvas automatically. The same hidden `#/bench` diagnostic is
+available in hosted Studio and Desktop builds.
 
 The WebGL view changes detail with zoom. Far out, it keeps a deterministic
 sample of the edges with the best-connected endpoints; approaching restores
@@ -107,12 +108,19 @@ npm run build
 ```
 
 `npm run build` writes `dist/`. The build uses relative paths and hash
-routing, so `dist/` can be hosted on any static server. Point it at a
+routing, so `dist/` can be hosted on any static server, including below a
+path prefix. Serve the generated assets with their normal JavaScript MIME
+types so the bundled module layout worker can load. Point the Studio at a
 Grafeno engine started with `--cors-origin <that origin>`.
+
+WebGPU is available to the hosted Studio only in a secure context (normally
+HTTPS or localhost) and on a compatible browser and GPU. The worker falls
+back to d3-force automatically when any of those requirements is missing;
+WebGL2 and Canvas have the same fallback behavior described above.
 
 It calls the API through the TypeScript client in `../client`.
 
-The same build is the desktop app's window (`../desktop`). There,
+This exact `dist/` is also the desktop app's window (`../desktop`). There,
 `src/desktop.ts` sends requests through the app, the start screen opens
 database files or connects to a server, files are saved with dialogs and
 the native menu drives the views.

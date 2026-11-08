@@ -123,3 +123,16 @@
 - See [`../qa/workspace-validation.md`](../qa/workspace-validation.md) for the
   validation matrix, environment boundary and packaging handoff.
 
+### Phase 6 — Desktop packaging
+
+- **Built:** Windows x64 NSIS and MSI packages from the validated shared
+  Studio bundle.
+- **Built:** Linux x86-64 DEB and RPM packages in the repository's Debian 12
+  packaging container.
+- **Inspected:** Linux package metadata and contents confirm the Desktop app,
+  launcher and icons are present without bundling the Grafeno engine.
+- **Reserved for release CI:** the AppImage, optional Windows code signing,
+  stable download aliases and release publication.
+- See [`../qa/packaging-validation.md`](../qa/packaging-validation.md) for
+  commands, package sizes, checksums and the release boundary.
+

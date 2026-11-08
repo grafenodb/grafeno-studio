@@ -85,6 +85,9 @@ engine's repository (engine phase 15).
 - **Workspace validation**: the shared production bundle passes the complete
   Studio and Desktop test suites and the responsive shell matrix from
   1920×1080 through 1024×768 before native installer packaging.
+- **Packaging validation**: Windows NSIS/MSI and Linux DEB/RPM packages build
+  from the shared Studio bundle; package inspection confirms Desktop does not
+  carry the Grafeno engine. AppImage and signing remain release-CI outputs.
 - **Installers**: Windows (`.exe`, `.msi`, for the current user), Linux
   (`.deb`, `.rpm`, `.AppImage`); none carries an engine or installs a
   service. The Studio's web build as a `.zip`, for a web server.

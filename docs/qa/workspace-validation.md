@@ -48,6 +48,7 @@ before packaging without claiming a native installer smoke test.
 
 ## Packaging boundary
 
-No Windows or Linux installer was produced in this phase. The next release
-step is to build the Windows Tauri targets on Windows and the Linux targets on
-Linux, then smoke-test each generated package with a real Grafeno engine.
+Packaging was intentionally deferred from this validation phase and completed
+in the following phase. See
+[`packaging-validation.md`](packaging-validation.md) for the generated Windows
+and Linux packages, checksums and remaining release-CI boundary.

@@ -77,6 +77,11 @@ engine's repository (engine phase 15).
 - **Data tools**: query results add a collapsible JSON tree, complete JSON
   copy and per-cell copy actions; the web connection screen now shares the
   saved-server list used by Desktop, including select and forget actions.
+- **Graph workspace**: grouped discovery and analysis controls, loaded-graph
+  label and fact filters, temporal filtering, and clearer contextual
+  inspectors refine Graph Explorer without increasing its bounded loading.
+- **One Overview document**: switching namespaces updates the global Overview
+  tab instead of accumulating one Overview tab for every namespace.
 - **Installers**: Windows (`.exe`, `.msi`, for the current user), Linux
   (`.deb`, `.rpm`, `.AppImage`); none carries an engine or installs a
   service. The Studio's web build as a `.zip`, for a web server.

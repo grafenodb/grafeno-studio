@@ -21,7 +21,7 @@ export function workspaceDocument(view: string, namespace: string, param?: strin
   return {
     // A document is a tool inside one namespace. Route parameters (such as
     // the selected node) update that document instead of spawning new tabs.
-    id: [cleanView, cleanNamespace].map(encodeURIComponent).join(":"),
+    id: cleanView === "overview" ? "overview" : [cleanView, cleanNamespace].map(encodeURIComponent).join(":"),
     view: cleanView,
     namespace: cleanNamespace,
     ...(cleanParam ? { param: cleanParam } : {}),

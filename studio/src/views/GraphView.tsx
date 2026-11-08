@@ -57,6 +57,8 @@ export function GraphView({ seed }: { seed?: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const minimap = useRef<HTMLCanvasElement>(null);
   const toolbar = useRef<HTMLDivElement>(null);
+  const filterBox = useRef<HTMLDivElement>(null);
+  const filterMenu = useRef<HTMLDivElement>(null);
   const engine = useRef<GraphEngine | null>(null);
   const rootRequest = useRef(0);
   const [expanded, setExpanded] = useState<string[]>(seed ? [seed] : []);
@@ -69,6 +71,9 @@ export function GraphView({ seed }: { seed?: string }) {
   const [menu, setMenu] = useState<Menu | null>(null);
   const [search, setSearch] = useState("");
   const [validAt, setValidAt] = useState("");
+  const [labelFilter, setLabelFilter] = useState("");
+  const [edgeFilter, setEdgeFilter] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [colorBy, setColorBy] = useState<ColorBy>("label");
@@ -87,6 +92,18 @@ export function GraphView({ seed }: { seed?: string }) {
   useEffect(() => () => { rootRequest.current++; }, [client, namespace]);
   const names = useMemo(() => new Map([...nodes.values()].map((node) => [node.id, displayName(node)])), [nodes]);
   const nameOf = (id: string) => names.get(id) ?? id;
+  const labelOptions = useMemo(() => [...new Set([...nodes.values()].flatMap((node) => node.labels))].sort(), [nodes]);
+  const edgeOptions = useMemo(() => [...new Set([...edges.values()].map((edge) => edge.label))].sort(), [edges]);
+
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const close = (event: MouseEvent) => {
+      const target = event.target as globalThis.Node;
+      if (!filterBox.current?.contains(target) && !filterMenu.current?.contains(target)) setFiltersOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [filtersOpen]);
 
   // Handlers bound once read the latest values from here.
   const latest = useRef({ expand, newEdge, nameOf, collapsed, setCollapsed });
@@ -206,6 +223,7 @@ export function GraphView({ seed }: { seed?: string }) {
     const groupOf = (id: string) => groups?.values.get(id);
     const placeOf = (id: string): string | null => {
       if (hidden.has(id)) return null;
+      if (labelFilter && !nodes.get(id)?.labels.includes(labelFilter)) return null;
       const group = groupOf(id);
       return group !== undefined && collapsed.has(group) ? `${CLUSTER}${group}` : id;
     };
@@ -242,6 +260,7 @@ export function GraphView({ seed }: { seed?: string }) {
     const links: EdgeInput[] = [];
     const merged = new Map<string, EdgeInput & { n: number }>();
     for (const edge of edges.values()) {
+      if (edgeFilter && edge.label !== edgeFilter) continue;
       const from = placeOf(edge.from);
       const to = placeOf(edge.to);
       if (!from || !to || !nodes.has(edge.from) || !nodes.has(edge.to)) continue;
@@ -264,7 +283,7 @@ export function GraphView({ seed }: { seed?: string }) {
     links.push(...merged.values());
     return { nodes: out, edges: links };
     // The theme changes the series colors, read from CSS.
-  }, [nodes, edges, hidden, collapsed, groups, scores, expanded, theme]);
+  }, [nodes, edges, hidden, collapsed, groups, scores, expanded, labelFilter, edgeFilter, theme]);
 
   useEffect(() => {
     engine.current?.setData(drawn.nodes, drawn.edges);
@@ -403,6 +422,11 @@ export function GraphView({ seed }: { seed?: string }) {
     if (event.target instanceof Element && event.target.closest("input, textarea, select, .inspector")) return;
     const key = event.key.toLowerCase();
     if (key === "escape") {
+      if (filtersOpen) {
+        setFiltersOpen(false);
+        event.preventDefault();
+        return;
+      }
       setMenu(null);
       setSelected([]);
       setSelectedEdge(null);
@@ -496,6 +520,9 @@ export function GraphView({ seed }: { seed?: string }) {
   const edge = selectedEdge ? edges.get(selectedEdge) : undefined;
   const single = selected.length === 1 && !selected[0].startsWith(CLUSTER) ? selected[0] : null;
   const visible = drawn.nodes.length;
+  const activeFilters = Number(Boolean(labelFilter)) + Number(Boolean(edgeFilter)) + Number(Boolean(validAt));
+  const inspectorTitle = single ? nameOf(single) : edge ? edge.label : `${selected.length} nodes`;
+  const inspectorKind = single ? "Node inspector" : edge ? "Fact inspector" : "Selection";
 
   return (
     <div className="graph" aria-busy={loading} ref={host} tabIndex={-1} onKeyDown={onKey}>
@@ -503,55 +530,78 @@ export function GraphView({ seed }: { seed?: string }) {
         <canvas className="graph-canvas" ref={canvas} aria-label="Graph canvas" />
       </div>
       <div className="graph-toolbar" ref={toolbar}>
-        <div className="input-icon grow">
-          <Icon name="search" />
-          <input
-            placeholder="Find a node: on screen, by name or text, or paste an id"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && void addFromSearch()}
-          />
+        <div className="graph-toolbar-group graph-find-tools">
+          <div className="input-icon grow">
+            <Icon name="search" />
+            <input
+              placeholder="Find a node, text or id"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && void addFromSearch()}
+            />
+          </div>
+          <button onClick={() => void addFromSearch()}>Add</button>
+          <button onClick={() => void showAll()} disabled={busy} title="Draw the first 60 nodes and their facts">
+            Show all
+          </button>
         </div>
-        <button onClick={() => void addFromSearch()}>Add</button>
-        <button onClick={() => void showAll()} disabled={busy} title="Draw the first 60 nodes and their facts">
-          Show all
-        </button>
         <span className="toolbar-sep" />
         <button className="primary" onClick={() => newNode({ onCreated: (id) => expand(id) })}>
           <Icon name="node" /> Node
         </button>
         <span className="toolbar-sep" />
-        <label className="row small nowrap" title="Color nodes by a graph algorithm run on the whole namespace">
-          Color
-          <select value={colorBy} onChange={(e) => setColorBy(e.target.value as ColorBy)}>
-            {Object.entries(COLOR_BY).map(([key, option]) => (
-              <option key={key} value={key}>
-                {option.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="row small nowrap" title="Size nodes by a centrality score over the whole namespace">
-          Size
-          <select value={sizeBy} onChange={(e) => setSizeBy(e.target.value as SizeBy)}>
-            {Object.entries(SIZE_BY).map(([key, option]) => (
-              <option key={key} value={key}>
-                {option.title}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="graph-toolbar-group graph-analysis-tools">
+          <label className="row small nowrap" title="Color nodes by a graph algorithm run on the whole namespace">
+            Color
+            <select value={colorBy} onChange={(e) => setColorBy(e.target.value as ColorBy)}>
+              {Object.entries(COLOR_BY).map(([key, option]) => (
+                <option key={key} value={key}>{option.title}</option>
+              ))}
+            </select>
+          </label>
+          <label className="row small nowrap" title="Size nodes by a centrality score over the whole namespace">
+            Size
+            <select value={sizeBy} onChange={(e) => setSizeBy(e.target.value as SizeBy)}>
+              {Object.entries(SIZE_BY).map(([key, option]) => (
+                <option key={key} value={key}>{option.title}</option>
+              ))}
+            </select>
+          </label>
+        </div>
         <span className="toolbar-sep" />
-        <label className="row small nowrap" title="Show only facts that were true on this date">
-          <Icon name="clock" /> Valid at
-          <input type="date" value={validAt} onChange={(e) => setValidAt(e.target.value)} />
-        </label>
-        {validAt && (
-          <button className="ghost small-button" onClick={() => setValidAt("")}>
-            Now
+        <div className="graph-filter-anchor" ref={filterBox}>
+          <button className={activeFilters ? "graph-filter-button active" : "graph-filter-button"} onClick={() => setFiltersOpen((value) => !value)} aria-expanded={filtersOpen}>
+            <Icon name="filter" size={14} /> Filters
+            {activeFilters > 0 && <span className="badge">{activeFilters}</span>}
           </button>
-        )}
+        </div>
       </div>
+      {filtersOpen && (
+        <div className="graph-filter-menu" ref={filterMenu}>
+          <header>
+            <div><strong>Visible graph</strong><span>Filter the nodes and facts already loaded.</span></div>
+            <button className="ghost icon-button" aria-label="Close filters" onClick={() => setFiltersOpen(false)}><Icon name="x" size={14} /></button>
+          </header>
+          <label className="field small">Node label
+            <select value={labelFilter} onChange={(event) => setLabelFilter(event.target.value)}>
+              <option value="">All labels</option>
+              {labelOptions.map((label) => <option value={label} key={label}>{label}</option>)}
+            </select>
+          </label>
+          <label className="field small">Fact type
+            <select value={edgeFilter} onChange={(event) => setEdgeFilter(event.target.value)}>
+              <option value="">All fact types</option>
+              {edgeOptions.map((label) => <option value={label} key={label}>{label}</option>)}
+            </select>
+          </label>
+          <label className="field small" title="Reload loaded roots with facts that were true on this date">Valid at
+            <input type="date" value={validAt} onChange={(event) => setValidAt(event.target.value)} />
+          </label>
+          <footer>
+            <button className="ghost" disabled={activeFilters === 0} onClick={() => { setLabelFilter(""); setEdgeFilter(""); setValidAt(""); }}>Reset filters</button>
+          </footer>
+        </div>
+      )}
 
       <div className="graph-controls" role="toolbar" aria-label="View">
           <button className="ghost icon-button" onClick={() => engine.current?.zoomBy(1 / 1.3)} title="Zoom out (−)">
@@ -580,6 +630,8 @@ export function GraphView({ seed }: { seed?: string }) {
       <div className="canvas-status small">
         {visible} nodes · {drawn.edges.length} facts
         {hidden.size > 0 && ` · ${hidden.size} hidden`}
+        {labelFilter && ` · label ${labelFilter}`}
+        {edgeFilter && ` · fact ${edgeFilter}`}
         {validAt && ` · valid on ${validAt}`}
         {groups && ` · ${groups.groups} ${colorBy === "wcc" ? "components" : "communities"}`}
         {scores && ` · sized by ${SIZE_BY[sizeBy].title}`}
@@ -596,6 +648,13 @@ export function GraphView({ seed }: { seed?: string }) {
         <div className="hint">
           <div className="empty-art" aria-hidden="true" />
           <p>Find a node above, press “Show all”, or create a node.</p>
+        </div>
+      )}
+      {expanded.length > 0 && visible === 0 && activeFilters > 0 && (
+        <div className="hint">
+          <Icon name="filter" size={28} />
+          <p>No loaded item matches the current filters.</p>
+          <button className="primary" onClick={() => { setLabelFilter(""); setEdgeFilter(""); setValidAt(""); }}>Reset filters</button>
         </div>
       )}
 
@@ -624,7 +683,24 @@ export function GraphView({ seed }: { seed?: string }) {
       )}
 
       {inspectorOpen && (
-        <aside className="inspector">
+        <aside className="inspector graph-inspector" aria-label={inspectorKind}>
+          <div className="graph-inspector-title">
+            <div>
+              <span>{inspectorKind}</span>
+              <strong>{inspectorTitle}</strong>
+            </div>
+            <button
+              className="ghost icon-button"
+              onClick={() => {
+                setSelected([]);
+                setSelectedEdge(null);
+                engine.current?.select([]);
+              }}
+              aria-label="Close inspector"
+            >
+              <Icon name="x" />
+            </button>
+          </div>
           <div className="inspector-head">
             {single && (
               <>
@@ -643,20 +719,6 @@ export function GraphView({ seed }: { seed?: string }) {
                 </button>
               </>
             )}
-            {selected.length > 1 && <strong>{selected.length} nodes</strong>}
-            {edge && <strong>Fact</strong>}
-            <div className="spacer" />
-            <button
-              className="ghost icon-button"
-              onClick={() => {
-                setSelected([]);
-                setSelectedEdge(null);
-                engine.current?.select([]);
-              }}
-              aria-label="Close"
-            >
-              <Icon name="x" />
-            </button>
           </div>
           {single && <NodeDetail key={single} id={single} compact />}
           {selected.length > 1 && (

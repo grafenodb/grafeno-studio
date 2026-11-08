@@ -101,10 +101,16 @@
 
 ### Phase 4 — Graph workspace
 
-- Refine Graph Explorer toolbars and contextual inspector around the existing
-  graph engine.
-- Add only layouts and filters supported efficiently by the current renderer.
-- Preserve bounded loading and progressive expansion.
+- **Implemented:** reorganize Graph Explorer into grouped discovery, creation,
+  analysis and filter controls around the existing renderer.
+- **Implemented:** add loaded-graph filters for node labels and fact types,
+  retain the existing temporal reload filter, and provide a single reset.
+- **Implemented:** give node, fact and multi-selection inspectors a persistent
+  contextual heading without covering the canvas controls.
+- **Preserved:** Show all remains capped at 60 roots, expansion stays batched,
+  and inactive graph documents still destroy their worker and GPU resources.
+- **Fixed:** Overview is one global document that follows the selected
+  namespace instead of opening one tab per namespace.
 
 ### Phase 5 — Validation
 

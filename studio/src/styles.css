@@ -2316,6 +2316,24 @@ dl.facts dd {
   box-shadow: var(--shadow);
 }
 
+@media (max-width: 1120px) {
+  .graph-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    overscroll-behavior-inline: contain;
+  }
+
+  .graph-toolbar > * {
+    flex: 0 0 auto;
+  }
+
+  .graph-toolbar > .grow {
+    flex-basis: 250px;
+  }
+}
+
 .toolbar-sep {
   width: 1px;
   height: 22px;
@@ -2873,6 +2891,45 @@ button.schema-item {
   min-height: 0;
 }
 
+.result-cell {
+  position: relative;
+  padding-right: 34px;
+}
+
+.result-cell-content {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.result-cell-copy {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  width: 22px;
+  min-height: 22px;
+  padding: 0;
+  translate: 0 -50%;
+  place-items: center;
+  border: 0;
+  border-radius: 3px;
+  color: var(--faint);
+  background: var(--panel-solid);
+  opacity: 0;
+}
+
+.result-cell:hover .result-cell-copy,
+.result-cell-copy:focus-visible {
+  opacity: 1;
+}
+
+.result-cell-copy:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
 .virtual-table {
   table-layout: fixed;
 }
@@ -2892,12 +2949,82 @@ button.schema-item {
   border: 0;
 }
 
-.json-view {
-  border: 0;
-  border-radius: 0;
+.json-tree {
+  display: flex;
   min-height: 100%;
-  background: transparent;
+  flex-direction: column;
+  background: var(--panel-solid);
 }
+
+.json-tree-toolbar {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 37px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.json-tree-body {
+  padding: 10px 13px 24px;
+  color: var(--text);
+  font-size: 11.5px;
+  line-height: 1.65;
+}
+
+.json-branch,
+.json-children,
+.json-entry {
+  display: block;
+}
+
+.json-toggle {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 3px 0 0;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  font: inherit;
+}
+
+.json-toggle:hover {
+  background: var(--hover);
+}
+
+.json-children {
+  margin-left: 7px;
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
+}
+
+.json-entry {
+  position: relative;
+  padding-left: 2px;
+}
+
+.json-key {
+  margin-right: 7px;
+  color: #267a62;
+}
+
+:root:not([data-theme="light"]) .json-key {
+  color: #7ed7bb;
+}
+
+.json-string { color: #8b5b28; }
+.json-number { color: #246b9c; }
+.json-boolean { color: #7651a8; }
+.json-null { color: var(--faint); font-style: italic; }
+.json-comma { color: var(--faint); }
+.json-close,
+.json-empty { display: block; color: var(--text); }
 
 .messages {
   display: flex;
@@ -3073,6 +3200,69 @@ button.schema-item {
 
 .connect-brand p {
   margin-top: 4px;
+}
+
+.connect-servers {
+  display: grid;
+  gap: 4px;
+  max-height: 154px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  overflow: auto;
+}
+
+.connect-servers > span {
+  padding: 0 4px 3px;
+}
+
+.connect-server {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 3px;
+}
+
+.connect-server-target {
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+}
+
+.connect-server-target:hover {
+  background: var(--hover);
+}
+
+.connect-server-target strong,
+.connect-server-target small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connect-server-target strong {
+  font-size: 12px;
+}
+
+.connect-server-target small {
+  margin-top: 1px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.connect-server .icon-button {
+  width: 27px;
+  min-height: 27px;
 }
 
 .loading {
@@ -4229,8 +4419,16 @@ h2 {
 }
 
 .main.canvas-view {
+  grid-column: 2;
+  grid-row: 3;
   padding: 0;
   background: transparent;
+  z-index: auto;
+}
+
+.main.canvas-view .graph {
+  --clear-left: var(--gap);
+  --clear-top: var(--gap);
 }
 
 .workspace-tabs {

@@ -19,7 +19,9 @@ export function workspaceDocument(view: string, namespace: string, param?: strin
   const cleanNamespace = namespace || "default";
   const cleanParam = param || undefined;
   return {
-    id: [cleanView, cleanNamespace, cleanParam ?? ""].map(encodeURIComponent).join(":"),
+    // A document is a tool inside one namespace. Route parameters (such as
+    // the selected node) update that document instead of spawning new tabs.
+    id: [cleanView, cleanNamespace].map(encodeURIComponent).join(":"),
     view: cleanView,
     namespace: cleanNamespace,
     ...(cleanParam ? { param: cleanParam } : {}),
@@ -27,7 +29,9 @@ export function workspaceDocument(view: string, namespace: string, param?: strin
 }
 
 export function addWorkspaceDocument(documents: WorkspaceDocument[], document: WorkspaceDocument): WorkspaceDocument[] {
-  if (documents.some((item) => item.id === document.id)) return documents;
+  if (documents.some((item) => item.id === document.id)) {
+    return documents.map((item) => (item.id === document.id ? document : item));
+  }
   return [...documents.slice(-(MAX_DOCUMENTS - 1)), document];
 }
 
@@ -48,7 +52,17 @@ export function readWorkspaceDocuments(key: string): WorkspaceDocumentState | nu
       .filter((item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index)
       .slice(-MAX_DOCUMENTS);
     if (documents.length === 0) return null;
-    return { documents, active: documents.some((item) => item.id === value.active) ? value.active : documents[0].id };
+    const previousActive = value.documents.find(
+      (item): item is Partial<WorkspaceDocument> & { view: string; namespace: string } =>
+        Boolean(item) && typeof item === "object" && "id" in item && item.id === value.active &&
+        typeof item.view === "string" && typeof item.namespace === "string",
+    );
+    const activeDocument = previousActive
+      ? workspaceDocument(previousActive.view, previousActive.namespace, typeof previousActive.param === "string" ? previousActive.param : undefined)
+      : undefined;
+    const restored = activeDocument ? documents.map((item) => (item.id === activeDocument.id ? activeDocument : item)) : documents;
+    const migratedActive = activeDocument?.id ?? value.active;
+    return { documents: restored, active: restored.some((item) => item.id === migratedActive) ? migratedActive : restored[0].id };
   } catch {
     return null;
   }

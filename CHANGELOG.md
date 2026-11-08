@@ -70,10 +70,13 @@ engine's repository (engine phase 15).
   module across the top while a contextual namespace tree anchors the side,
   giving dense graph data the structure of a desktop administration client;
   Canvas and WebGL nodes retain the mark's green palette and geometry.
-- **Restorable workspace documents**: tools, graphs and selected nodes open
-  as closable namespace-aware tabs, restore locally per connection, and keep
-  inactive graph renderers unmounted; Ctrl+PageUp/PageDown cycles tabs and
-  Ctrl+W closes the active one.
+- **Restorable workspace documents**: tools open as closable namespace-aware
+  tabs while node selections update the existing Explorer document; tabs
+  restore locally per connection and keep inactive graph renderers unmounted.
+  Ctrl+PageUp/PageDown cycles tabs and Ctrl+W closes the active one.
+- **Data tools**: query results add a collapsible JSON tree, complete JSON
+  copy and per-cell copy actions; the web connection screen now shares the
+  saved-server list used by Desktop, including select and forget actions.
 - **Installers**: Windows (`.exe`, `.msi`, for the current user), Linux
   (`.deb`, `.rpm`, `.AppImage`); none carries an engine or installs a
   service. The Studio's web build as a `.zip`, for a web server.

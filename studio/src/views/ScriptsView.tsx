@@ -5,6 +5,7 @@ import { type QueryResult, describeError, go, labelColor } from "../api.ts";
 import { ACTIVE_SCRIPT, clientStorage, migrateLegacyScripts, requestPersistentBrowserStorage, resolveOwner, type StoredScript } from "../client-storage.ts";
 import { Chart, canChart } from "../components/Chart.tsx";
 import { type CodeEditorHandle, CodeEditor } from "../components/CodeEditor.tsx";
+import { JsonTree } from "../components/JsonTree.tsx";
 import { MiniGraph, hasGraph } from "../components/MiniGraph.tsx";
 import { ResultTable } from "../components/ResultTable.tsx";
 import { useStudio } from "../context.ts";
@@ -611,7 +612,7 @@ export function ScriptsView() {
                   rows={current.profile.map((step) => [step.step, step.operation, step.rows ?? null, step.reads ?? null, (step.time_ms ?? 0).toFixed(2), step.details])}
                 />
               ) : mode === "json" ? (
-                <pre className="json-view">{JSON.stringify(current.rows, null, 2)}</pre>
+                <JsonTree value={current.rows} />
               ) : mode === "graph" && hasGraph(current.rows) ? (
                 <MiniGraph rows={current.rows} onOpen={openNode} />
               ) : (

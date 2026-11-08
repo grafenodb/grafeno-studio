@@ -79,7 +79,8 @@
 ### Phase 2 — Workspace documents
 
 - **Implemented:** define a document model for every routed workspace tool,
-  including namespace and selected node identity.
+  scoped by namespace; route selections update their tool document instead
+  of creating an unbounded tab for every node.
 - **Implemented:** keep only the active routed view mounted, so inactive graph
   documents do not retain workers, WebGL contexts or pending requests.
 - **Implemented:** close, cycle and restore documents from connection-scoped
@@ -88,10 +89,15 @@
 
 ### Phase 3 — Data tools
 
-- Refine Scripts around its existing editor, result splitter and result modes.
-- Add structured JSON expansion and cell copy where it does not alter query
-  semantics.
-- Consolidate connection management around the existing saved-server flow.
+- **Implemented:** retain the existing CodeMirror editor, local script tabs,
+  result splitter and Table/Graph/Chart/Profile modes without changing query
+  execution.
+- **Implemented:** replace flat JSON text with a collapsible structured tree,
+  full JSON copy and per-cell value copy in result tables.
+- **Implemented:** expose the shared saved-server list in the web connection
+  screen, with select and forget actions matching Desktop's existing flow.
+- **Fixed:** reuse tool tabs as selections change and constrain Graph Explorer
+  to the content grid so it cannot cover the document strip.
 
 ### Phase 4 — Graph workspace
 

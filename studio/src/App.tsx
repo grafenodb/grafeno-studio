@@ -8,11 +8,14 @@ import { type About,
   describeError,
   displayName,
   forgetConnection,
+  forgetServer,
   go,
   labelColor,
   loadConnection,
+  loadServers,
   probe,
   saveConnection,
+  saveServer,
 } from "./api.ts";
 import { EdgeForm, NodeForm } from "./components/Forms.tsx";
 import { type ConfirmOptions, type NewEdgeOptions, type NewNodeOptions, type Studio, StudioContext, useStudio } from "./context.ts";
@@ -78,6 +81,15 @@ function writeSetting(key: string, value: string): void {
   }
 }
 
+function serverLabel(address: string): string {
+  try {
+    const members = address.split(",").map((value) => new URL(value.trim()).host);
+    return members.length > 1 ? `${members[0]} +${members.length - 1}` : members[0];
+  } catch {
+    return address;
+  }
+}
+
 function ConnectScreen({ initial, error, onConnect }: {
   initial: Connection;
   error: string | null;
@@ -93,7 +105,12 @@ function ConnectScreen({ initial, error, onConnect }: {
   const [setup, setSetup] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [servers, setServers] = useState(loadServers);
   const cleanUrl = url.trim().replace(/\/+$/, "");
+
+  const rememberServer = (secret: string) => {
+    if (remember) setServers(saveServer({ name: serverLabel(cleanUrl), url: cleanUrl, token: secret }));
+  };
 
   // An open server with no accounts offers to make the first one.
   useEffect(() => {
@@ -120,6 +137,7 @@ function ConnectScreen({ initial, error, onConnect }: {
     try {
       const client = clientFor({ url: cleanUrl, token: "" });
       const tokens = setup ? await client.setup(name.trim(), password) : await client.signIn(name.trim(), password);
+      rememberServer("");
       onConnect({ url: cleanUrl, token: tokens.access_token, refresh: tokens.refresh_token, user: tokens.account.name }, remember);
     } catch (failure) {
       setProblem(describeError(failure));
@@ -136,7 +154,10 @@ function ConnectScreen({ initial, error, onConnect }: {
         onSubmit={(event) => {
           event.preventDefault();
           if (mode === "signin") void signIn();
-          else onConnect({ url: cleanUrl, token: token.trim() }, remember);
+          else {
+            rememberServer(token.trim());
+            onConnect({ url: cleanUrl, token: token.trim() }, remember);
+          }
         }}
       >
         <div className="connect-brand">
@@ -146,6 +167,32 @@ function ConnectScreen({ initial, error, onConnect }: {
             <p className="muted">The graph engine for agent memory.</p>
           </div>
         </div>
+        {servers.length > 0 && (
+          <div className="connect-servers" aria-label="Saved servers">
+            <span className="muted small">Saved servers</span>
+            {servers.map((server) => (
+              <div className="connect-server" key={server.url}>
+                <button
+                  type="button"
+                  className="connect-server-target"
+                  title={server.url}
+                  onClick={() => {
+                    setUrl(server.url);
+                    setToken(server.token);
+                    setMode(server.token ? "token" : "signin");
+                    setProblem(null);
+                  }}
+                >
+                  <span className="live-dot" />
+                  <span><strong>{server.name || serverLabel(server.url)}</strong><small>{server.url}</small></span>
+                </button>
+                <button type="button" className="ghost icon-button" title={`Forget ${server.name}`} onClick={() => setServers(forgetServer(server.url))}>
+                  <Icon name="x" size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <label className="field">
           Server URL
           <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://127.0.0.1:7810" required />

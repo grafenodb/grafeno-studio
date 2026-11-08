@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
 import { displayName, go, labelColor } from "../api.ts";
+import { copyText, copyValueText } from "../clipboard.ts";
 import { VIRTUALIZE_AFTER, virtualWindow } from "../graph/virtual-table.ts";
+import { Icon } from "../icons.tsx";
 
 type Json = unknown;
 
@@ -46,6 +48,7 @@ export function Cell({ value }: { value: Json }) {
 export function ResultTable({ columns, rows }: { columns: string[]; rows: Json[][] }) {
   const wrap = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ top: 0, height: 600 });
+  const [copied, setCopied] = useState<string | null>(null);
   const virtual = rows.length > VIRTUALIZE_AFTER;
   useEffect(() => {
     const element = wrap.current;
@@ -62,7 +65,7 @@ export function ResultTable({ columns, rows }: { columns: string[]; rows: Json[]
     setViewport((value) => ({ ...value, top: 0 }));
   }, [rows, virtual]);
   if (columns.length === 0) return null;
-  const window = virtual ? virtualWindow(viewport.top, viewport.height, rows.length) : { start: 0, end: rows.length, before: 0, after: 0 };
+  const visibleWindow = virtual ? virtualWindow(viewport.top, viewport.height, rows.length) : { start: 0, end: rows.length, before: 0, after: 0 };
   return (
     <div
       className={virtual ? "table-wrap virtual-table-wrap" : "table-wrap"}
@@ -78,20 +81,32 @@ export function ResultTable({ columns, rows }: { columns: string[]; rows: Json[]
           </tr>
         </thead>
         <tbody>
-          {window.before > 0 && <tr className="virtual-spacer" aria-hidden="true"><td colSpan={Math.max(1, columns.length)} style={{ height: window.before }} /></tr>}
-          {rows.slice(window.start, window.end).map((row, offset) => {
-            const index = window.start + offset;
+          {visibleWindow.before > 0 && <tr className="virtual-spacer" aria-hidden="true"><td colSpan={Math.max(1, columns.length)} style={{ height: visibleWindow.before }} /></tr>}
+          {rows.slice(visibleWindow.start, visibleWindow.end).map((row, offset) => {
+            const index = visibleWindow.start + offset;
             return (
             <tr key={index}>
               {row.map((value, column) => (
-                <td key={column}>
-                  <Cell value={value} />
+                <td key={column} className="result-cell">
+                  <span className="result-cell-content"><Cell value={value} /></span>
+                  <button
+                    className="result-cell-copy"
+                    title="Copy value"
+                    aria-label={`Copy row ${index + 1}, ${columns[column] ?? `column ${column + 1}`}`}
+                    onClick={() => void copyText(copyValueText(value)).then(() => {
+                      const key = `${index}:${column}`;
+                      setCopied(key);
+                      window.setTimeout(() => setCopied((current) => (current === key ? null : current)), 1200);
+                    })}
+                  >
+                    <Icon name={copied === `${index}:${column}` ? "check" : "copy"} size={12} />
+                  </button>
                 </td>
               ))}
             </tr>
             );
           })}
-          {window.after > 0 && <tr className="virtual-spacer" aria-hidden="true"><td colSpan={Math.max(1, columns.length)} style={{ height: window.after }} /></tr>}
+          {visibleWindow.after > 0 && <tr className="virtual-spacer" aria-hidden="true"><td colSpan={Math.max(1, columns.length)} style={{ height: visibleWindow.after }} /></tr>}
         </tbody>
       </table>
     </div>

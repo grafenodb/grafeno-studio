@@ -11,6 +11,33 @@ Each version says which engines it works with. It speaks to engines only
 through their HTTP API, checks each one on connecting (`GET /v1/about`),
 and hides what an engine lacks.
 
+## 0.2.1 (2026-11-08)
+
+This release introduces the redesigned Grafeno Studio workspace across Web,
+Windows and Linux while preserving compatibility with Grafeno HTTP API v1.
+
+- **Graph database workspace**: a modern, light-first interface with Grafeno's
+  visual identity, full-width module navigation and a hierarchical namespace
+  explorer.
+- **Restorable workspace tabs**: tools open as closable, namespace-aware
+  documents and restore locally without retaining inactive graph renderers.
+- **Improved data tools**: structured JSON results, complete JSON export,
+  per-cell copy actions and shared saved-server management.
+- **Graph workspace**: improved discovery, creation, analysis and filtering
+  controls with clearer node and fact inspection.
+- **One Overview document**: changing namespace updates the existing Overview
+  tab instead of creating duplicate tabs.
+- **Local script library**: scripts remain stored on the user's device through
+  IndexedDB on Web and bundled SQLite on Desktop.
+- **Responsive Web and Desktop parity**: the same production Studio bundle is
+  used by browsers and the Windows/Linux clients.
+- **Stable navigation**: namespace and tab changes avoid unnecessary view
+  remounts, while sidebar transitions no longer expose compressed content.
+- **Session controls**: signing out, disconnecting or closing a local database
+  is available from a fixed action in the top-right header.
+- **Packaging**: Windows NSIS/MSI, Linux DEB/RPM/AppImage and the hosted Studio
+  ZIP are built from the same validated source.
+
 ## 0.2.0 (2026-11-07)
 
 The first release on its own: the interface and the desktop app left the

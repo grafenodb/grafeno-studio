@@ -63,6 +63,10 @@ function parseHash(): { view: string; param?: string } {
   return { view: known ? known.id : "overview", param: param ? decodeURIComponent(param) : undefined };
 }
 
+function sameRoute(left: { view: string; param?: string }, right: { view: string; param?: string }): boolean {
+  return left.view === right.view && left.param === right.param;
+}
+
 type Theme = "system" | "light" | "dark";
 
 function readSetting(key: string, fallback: string): string {
@@ -566,7 +570,10 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const onHash = () => setRoute(parseHash());
+    const onHash = () => {
+      const next = parseHash();
+      setRoute((current) => (sameRoute(current, next) ? current : next));
+    };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
@@ -692,7 +699,10 @@ export function App() {
   const activateDocument = useCallback((document: WorkspaceDocument) => {
     setActiveDocument(document.id);
     setNamespace(document.namespace);
-    setRoute({ view: document.view, param: document.param });
+    setRoute((current) => {
+      const next = { view: document.view, param: document.param };
+      return sameRoute(current, next) ? current : next;
+    });
     go(document.view, document.param);
   }, [setNamespace]);
 
@@ -829,6 +839,16 @@ export function App() {
     confirming?.resolve(ok);
     setConfirming(null);
   };
+  const sessionLabel = local ? "Close database" : connection.user ? "Sign out" : "Disconnect";
+  const leaveSession = async () => {
+    if (local) {
+      await closeLocal();
+      return;
+    }
+    if (connection.refresh) await client.signOut().catch(() => undefined);
+    forgetConnection();
+    setConnection(null);
+  };
   return (
     <StudioContext.Provider value={studio}>
       <div
@@ -843,6 +863,10 @@ export function App() {
               Grafeno <span>Studio</span>
             </span>
           </a>
+          <button className="topbar-session" type="button" onClick={() => void leaveSession()} title={sessionLabel}>
+            <Icon name="logout" size={14} />
+            <span>{sessionLabel}</span>
+          </button>
           <nav className="toolbar-nav" aria-label="Studio tools">
             {VIEWS.filter((item) => !item.needs || studio.supports(item.needs)).map((item) => (
               <a key={item.id} href={`#/${item.id}`} className={item.id === view ? "toolbar-item active" : "toolbar-item"} title={item.hint}>
@@ -977,7 +1001,7 @@ export function App() {
             );
           })}
         </div>
-        <main className={layout} key={`${connection.url}-${current}-${view}`}>
+        <main className={layout}>
           {view === "overview" && <OverviewView />}
           {view === "explorer" && <ExplorerView selected={route.param} />}
           {view === "graph" && <GraphView seed={route.param} />}

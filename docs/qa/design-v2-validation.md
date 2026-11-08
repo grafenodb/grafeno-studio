@@ -10,7 +10,10 @@ Validated on 2026-11-08 against the shared Grafeno Studio production bundle.
 - Light, Dark and live System theme modes.
 - Centered sidebar theme controls in expanded and collapsed layouts.
 - One connection presentation in the status bar, not the header.
+- A fixed session exit action at the right edge of the product identity row.
 - A reusable, collapsible and horizontally resizable inspector.
+- Stable namespace/tab navigation and a sidebar expansion that does not expose
+  compressed tree content mid-transition.
 - Natural-height Overview data and consistent user-facing “facts” wording.
 
 ## Automated checks

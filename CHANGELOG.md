@@ -92,6 +92,9 @@ engine's repository (engine phase 15).
   full-width module bar, neutral dark surfaces, live System theme behavior and
   a reusable contextual inspector make the shared Web/Desktop workspace denser
   and more predictable without changing Grafeno's API contracts.
+- **Stable workspace navigation**: sidebar transitions no longer expose
+  compressed content, namespace and tab changes reuse the active view whenever
+  possible, and a fixed header action closes or signs out of the current session.
 - **Installers**: Windows (`.exe`, `.msi`, for the current user), Linux
   (`.deb`, `.rpm`, `.AppImage`); none carries an engine or installs a
   service. The Studio's web build as a `.zip`, for a web server.

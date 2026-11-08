@@ -146,6 +146,9 @@
   and System follows live operating-system preference changes.
 - **Improved:** centered theme controls, natural-height Overview content,
   reusable namespace inspection and active-tab visibility under overflow.
+- **Stabilized:** sidebar content waits for the expand transition, routed views
+  are not remounted solely because a namespace changes, and session exit stays
+  fixed at the right edge of the product identity row.
 - See [`../qa/design-v2-validation.md`](../qa/design-v2-validation.md) for the
   functional, visual and viewport validation matrix.
 

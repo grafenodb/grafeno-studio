@@ -136,3 +136,17 @@
 - See [`../qa/packaging-validation.md`](../qa/packaging-validation.md) for
   commands, package sizes, checksums and the release boundary.
 
+### Phase 7 — IDE refinement
+
+- **Implemented:** compact File, Edit, View, Query, Tools and Help menus with
+  real actions, disabled states and keyboard navigation.
+- **Reorganized:** the full-width module navigation occupies its own row;
+  creation, connection, version and disconnect controls no longer compete
+  with module navigation.
+- **Refined:** dark mode uses neutral IDE surfaces while Light remains intact
+  and System follows live operating-system preference changes.
+- **Improved:** centered theme controls, natural-height Overview content,
+  reusable namespace inspection and active-tab visibility under overflow.
+- See [`../qa/design-v2-validation.md`](../qa/design-v2-validation.md) for the
+  functional, visual and viewport validation matrix.
+

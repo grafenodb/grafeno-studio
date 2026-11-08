@@ -88,6 +88,10 @@ engine's repository (engine phase 15).
 - **Packaging validation**: Windows NSIS/MSI and Linux DEB/RPM packages build
   from the shared Studio bundle; package inspection confirms Desktop does not
   carry the Grafeno engine. AppImage and signing remain release-CI outputs.
+- **Professional IDE chrome**: traditional application menus, a full-width
+  module bar, neutral dark surfaces, live System theme behavior and a reusable
+  contextual inspector make the shared Web/Desktop workspace denser and more
+  predictable without changing Grafeno's API contracts.
 - **Installers**: Windows (`.exe`, `.msi`, for the current user), Linux
   (`.deb`, `.rpm`, `.AppImage`); none carries an engine or installs a
   service. The Studio's web build as a `.zip`, for a web server.

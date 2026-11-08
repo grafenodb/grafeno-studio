@@ -1,9 +1,9 @@
-/* Grafeno Studio — the "graph lab" design system.
+/* Grafeno Studio — a compact graph database workbench.
 
-   Dark first: a deep canvas with floating glass panels, Space Grotesk for
-   the interface and JetBrains Mono for data, ids and code (both bundled).
-   Every color is a token; the light theme redefines them, chosen with
-   data-theme on <html> or by the system when the theme is "system". */
+   Space Grotesk serves the interface and JetBrains Mono the graph data,
+   identifiers and code (both bundled). Every color is a semantic token:
+   light preserves Grafeno's existing clarity, while dark uses neutral IDE
+   surfaces and reserves teal for identity, focus and live state. */
 
 :root {
   --font-sans: "Space Grotesk Variable", "Space Grotesk", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
@@ -3992,6 +3992,386 @@ td .badge {
   }
 }
 
+/* ----------------------------------------------------- IDE refinement v2
+   Neutral workbench chrome with Grafeno teal reserved for state and focus. */
+
+:root {
+  --bg: #1e1e1e;
+  --bg-2: #1e1e1e;
+  --glass: #202020;
+  --glass-strong: #252526;
+  --panel: #252526;
+  --panel-solid: #252526;
+  --panel-raised: #2d2d30;
+  --panel-2: #2a2a2c;
+  --hover: #343438;
+  --selection: rgb(57 184 154 / 18%);
+  --border: #343434;
+  --border-strong: #454545;
+  --text: #e5e5e5;
+  --muted: #a6a6a6;
+  --faint: #777777;
+  --accent: #39b89a;
+  --accent-2: #69cbb2;
+  --accent-text: #071713;
+  --accent-soft: rgb(57 184 154 / 12%);
+  --accent-glow: 0 0 0 1px rgb(57 184 154 / 42%);
+  --code: #1e1e1e;
+  --shadow-sm: none;
+  --shadow: 0 8px 22px rgb(0 0 0 / 28%);
+  --shadow-lg: 0 16px 40px rgb(0 0 0 / 42%);
+  --lattice-opacity: 0.025;
+  --bar: 82px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    --bg: #1e1e1e;
+    --bg-2: #1e1e1e;
+    --glass: #202020;
+    --glass-strong: #252526;
+    --panel: #252526;
+    --panel-solid: #252526;
+    --panel-raised: #2d2d30;
+    --panel-2: #2a2a2c;
+    --hover: #343438;
+    --selection: rgb(57 184 154 / 18%);
+    --border: #343434;
+    --border-strong: #454545;
+    --text: #e5e5e5;
+    --muted: #a6a6a6;
+    --faint: #777777;
+    --accent: #39b89a;
+    --accent-2: #69cbb2;
+    --accent-text: #071713;
+    --accent-soft: rgb(57 184 154 / 12%);
+    --code: #1e1e1e;
+    --lattice-opacity: 0.025;
+  }
+}
+
+.topbar {
+  grid-template-columns: var(--rail-now) minmax(0, 1fr);
+  grid-template-rows: 30px 52px;
+  height: var(--bar);
+  background: var(--panel-solid);
+}
+
+.topbar-brand {
+  grid-column: 1;
+  grid-row: 1;
+  gap: 7px;
+  padding: 3px 11px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar-brand .logo {
+  width: 23px;
+  height: 23px;
+}
+
+.topbar-brand .brand-text {
+  font-size: 13px;
+}
+
+.application-menus {
+  position: relative;
+  z-index: 30;
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--border);
+  background: #202020;
+}
+
+:root[data-theme="light"] .application-menus {
+  background: var(--panel-solid);
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"] .application-menus {
+    background: var(--panel-solid);
+  }
+}
+
+.application-menu {
+  position: relative;
+  display: flex;
+}
+
+.application-menu-trigger {
+  min-height: 28px;
+  padding: 2px 9px;
+  border: 0;
+  border-radius: 3px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 12px;
+}
+
+.application-menu-trigger:hover,
+.application-menu-trigger.active,
+.application-menu-trigger:focus-visible {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.application-menu-popup {
+  position: absolute;
+  z-index: 100;
+  top: calc(100% - 1px);
+  left: 0;
+  width: max-content;
+  min-width: 230px;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--panel-raised);
+  box-shadow: var(--shadow-lg);
+}
+
+.application-menu-group + .application-menu-group {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.application-menu-item {
+  display: grid;
+  grid-template-columns: 16px minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 27px;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 3px;
+  color: var(--text);
+  background: transparent;
+  font-size: 12px;
+  text-align: left;
+}
+
+.application-menu-item:hover,
+.application-menu-item:focus-visible {
+  background: var(--hover);
+}
+
+.application-menu-item:disabled {
+  color: var(--faint);
+  background: transparent;
+}
+
+.application-menu-item kbd {
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: 10px;
+}
+
+.application-menu-check {
+  color: var(--accent);
+  text-align: center;
+}
+
+.toolbar-nav {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: grid;
+  grid-auto-columns: minmax(74px, 1fr);
+  grid-auto-flow: column;
+  width: 100%;
+  padding: 3px 7px;
+  border-right: 0;
+  background: var(--panel-solid);
+}
+
+.toolbar-item {
+  min-width: 74px;
+  padding: 4px 8px;
+}
+
+.toolbar-item .icon {
+  color: currentColor;
+}
+
+.toolbar-item.active .icon,
+.toolbar-item:hover .icon {
+  color: var(--accent);
+}
+
+.sidebar-foot {
+  align-items: stretch;
+}
+
+.theme-switch {
+  align-self: center;
+  margin-inline: auto;
+}
+
+.theme-switch button {
+  width: 31px;
+  min-width: 31px;
+}
+
+.collapsed .theme-switch {
+  display: flex;
+  flex-direction: column;
+}
+
+.collapsed .sidebar-foot {
+  align-items: center;
+  padding-inline: 5px;
+}
+
+.collapsed .collapse-button {
+  width: 34px;
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.overview-grid {
+  grid-template-columns: minmax(420px, 1fr) auto;
+  align-items: start;
+}
+
+.overview-namespaces,
+.overview-composition {
+  align-self: start;
+}
+
+.contextual-inspector {
+  width: min(520px, 38vw);
+  min-width: 360px;
+  max-width: 48vw;
+  overflow: auto;
+  resize: horizontal;
+}
+
+.contextual-inspector.collapsed {
+  width: 48px;
+  min-width: 48px;
+  resize: none;
+}
+
+.inspector-heading {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+}
+
+.contextual-inspector.collapsed .inspector-heading {
+  justify-content: center;
+  padding-inline: 7px;
+}
+
+.contextual-inspector.collapsed .inspector-heading > div {
+  display: none;
+}
+
+.inspector-content {
+  min-width: 330px;
+}
+
+.shortcut-list {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) auto;
+  align-items: center;
+  gap: 10px 24px;
+  min-width: min(420px, 75vw);
+}
+
+.shortcut-list kbd {
+  justify-self: end;
+}
+
+.about-studio {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: min(360px, 70vw);
+}
+
+.about-studio strong {
+  font-size: 17px;
+}
+
+.about-studio p {
+  margin-top: 3px;
+}
+
+@media (max-width: 1100px) {
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .contextual-inspector,
+  .contextual-inspector.collapsed {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    resize: none;
+  }
+
+  .contextual-inspector.collapsed .inspector-heading {
+    justify-content: space-between;
+    padding-inline: 14px;
+  }
+
+  .contextual-inspector.collapsed .inspector-heading > div {
+    display: block;
+  }
+}
+
+@media (max-width: 860px) {
+  .app,
+  .app.collapsed {
+    grid-template-rows: var(--bar) var(--tabs) minmax(0, 1fr) var(--status);
+  }
+
+  .topbar {
+    grid-template-columns: minmax(148px, 0.28fr) minmax(0, 1fr);
+    grid-template-rows: 30px 52px;
+    height: var(--bar);
+  }
+
+  .topbar-brand {
+    display: flex;
+    justify-content: flex-start;
+    padding-inline: 9px;
+  }
+
+  .toolbar-nav {
+    grid-row: 2;
+    overflow-x: auto;
+  }
+
+  .application-menus {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .topbar-brand {
+    justify-content: center;
+    padding: 3px;
+  }
+
+  .topbar-brand .brand-text {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -5017,5 +5397,131 @@ button.primary {
 
   .main:not(.full, .canvas-view) {
     padding: 13px 9px 20px;
+  }
+}
+
+/* Final cascade for the two-row IDE chrome. Keep this after legacy shell
+   rules while the old selectors are removed incrementally. */
+:root {
+  --bar: 82px;
+}
+
+.topbar {
+  grid-template-columns: var(--rail-now) minmax(0, 1fr);
+  grid-template-rows: 30px 52px;
+  height: var(--bar);
+}
+
+.topbar-brand {
+  grid-column: 1;
+  grid-row: 1;
+  padding: 3px 11px;
+}
+
+.application-menus {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.toolbar-nav {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: grid;
+  grid-auto-columns: minmax(74px, 1fr);
+  grid-auto-flow: column;
+  width: 100%;
+  padding: 3px 7px;
+  border-right: 0;
+}
+
+.toolbar-item {
+  min-width: 74px;
+  padding: 4px 8px;
+}
+
+.main > .overview-page {
+  min-height: 0;
+}
+
+.overview-page .overview-grid {
+  flex: 0 0 auto;
+  grid-template-columns: minmax(420px, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+}
+
+.overview-page .overview-grid > .panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.overview-page .overview-composition {
+  border-inline-start: 1px solid var(--border) !important;
+}
+
+.contextual-inspector.collapsed {
+  width: 48px !important;
+  min-width: 48px !important;
+  max-width: 48px !important;
+}
+
+@media (max-width: 1100px) {
+  .overview-page .overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .contextual-inspector,
+  .contextual-inspector.collapsed {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+}
+
+@media (max-width: 860px) {
+  .app,
+  .app.collapsed {
+    grid-template-rows: var(--bar) var(--tabs) minmax(0, 1fr) var(--status);
+  }
+
+  .topbar {
+    grid-template-columns: minmax(148px, 0.28fr) minmax(0, 1fr);
+    grid-template-rows: 30px 52px;
+    height: var(--bar);
+  }
+
+  .topbar-brand {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1;
+    justify-content: flex-start;
+  }
+
+  .application-menus {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .toolbar-nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .topbar-brand {
+    justify-content: center;
+    padding-inline: 3px;
+  }
+
+  .topbar-brand .brand-text {
+    display: none;
   }
 }

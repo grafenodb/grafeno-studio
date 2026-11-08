@@ -70,7 +70,7 @@ export function AdminView() {
               {check.problems.length === 0 ? "Consistent." : `${check.problems.length} problems:`}
             </div>
             <div className="muted">
-              {check.nodes} nodes · {check.edges} edges · {check.texts} texts · {check.vectors} vectors · {check.dangling_links} dangling links
+              {check.nodes} nodes · {check.edges} facts · {check.texts} texts · {check.vectors} vectors · {check.dangling_links} dangling links
             </div>
             {check.problems.length > 0 && <pre>{check.problems.join("\n")}</pre>}
           </div>
@@ -81,7 +81,7 @@ export function AdminView() {
       <div className="panel stack">
         <h2>Export and import</h2>
         <p className="muted small" style={{ margin: 0 }}>
-          A JSON Lines file with nodes (text and embeddings included) and edges, keeping ids and times. Importing is all or
+          A JSON Lines file with nodes (text and embeddings included) and facts, keeping ids and times. Importing is all or
           nothing, and replaces records with the same ids.
         </p>
         <div className="row">
@@ -147,7 +147,7 @@ export function AdminView() {
         </div>
         {imported && (
           <div className="ok small">
-            Imported {imported.namespaces} namespaces, {imported.nodes} nodes and {imported.edges} edges.
+            Imported {imported.namespaces} namespaces, {imported.nodes} nodes and {imported.edges} facts.
           </div>
         )}
       </div>

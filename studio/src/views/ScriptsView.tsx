@@ -284,6 +284,41 @@ export function ScriptsView() {
     [running, active.text, client, namespace, stopOnError, changed, toast],
   );
 
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("grafeno:query-state", { detail: { running } }));
+    return () => {
+      window.dispatchEvent(new CustomEvent("grafeno:query-state", { detail: { running: false } }));
+    };
+  }, [running]);
+
+  useEffect(() => {
+    const run = () => void execute(false);
+    const runAll = () => void execute(true);
+    const stopRun = () => { stop.current = true; };
+    const create = () => addScript(`Script ${library.scripts.length + 1}`, "");
+    const resetLayout = () => {
+      setSplit(52);
+      setShowSchema(true);
+      try {
+        localStorage.setItem(LAYOUT_KEY, "52");
+      } catch {
+        // Layout persistence is optional.
+      }
+    };
+    window.addEventListener("grafeno:query-run", run);
+    window.addEventListener("grafeno:query-run-all", runAll);
+    window.addEventListener("grafeno:query-stop", stopRun);
+    window.addEventListener("grafeno:query-new", create);
+    window.addEventListener("grafeno:layout-reset", resetLayout);
+    return () => {
+      window.removeEventListener("grafeno:query-run", run);
+      window.removeEventListener("grafeno:query-run-all", runAll);
+      window.removeEventListener("grafeno:query-stop", stopRun);
+      window.removeEventListener("grafeno:query-new", create);
+      window.removeEventListener("grafeno:layout-reset", resetLayout);
+    };
+  }, [execute, library.scripts.length, owner, namespace]);
+
   const startDrag = (event: React.PointerEvent) => {
     event.preventDefault();
     const box = workspace.current?.getBoundingClientRect();
@@ -366,7 +401,7 @@ export function ScriptsView() {
                 />
               ))}
           </SchemaGroup>
-          <SchemaGroup title="Edge labels" empty="No facts yet.">
+          <SchemaGroup title="Fact types" empty="No facts yet.">
             {Object.entries(schema.edgeLabels)
               .sort((a, b) => b[1] - a[1])
               .map(([label, count]) => (

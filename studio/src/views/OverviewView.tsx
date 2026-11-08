@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { describeError, formatTime, go, labelColor } from "../api.ts";
 import { Icon, type IconName } from "../icons.tsx";
+import { InspectorPanel } from "../components/InspectorPanel.tsx";
 import { useStudio } from "../context.ts";
 import type { NamespaceStats } from "../../../client/src/index.ts";
 
@@ -74,7 +75,7 @@ export function OverviewView() {
                 <tr>
                   <th>Name</th>
                   <th>Nodes</th>
-                  <th>Edges</th>
+                  <th>Facts</th>
                   <th>Created</th>
                 </tr>
               </thead>
@@ -99,18 +100,12 @@ export function OverviewView() {
           </div>
         </section>
         {stats && (
-          <section className="panel overview-composition">
-            <header className="panel-heading">
-              <div>
-                <h2>Namespace details</h2>
-                <p className="muted small">{namespace}</p>
-              </div>
-            </header>
+          <InspectorPanel title="Namespace details" subtitle={namespace} className="overview-composition">
       {stats && (
         <section className="property-list" aria-label="Namespace totals">
           {[
             ["Nodes", stats.nodes, "node"],
-            ["Edges", stats.edges, "link"],
+            ["Facts", stats.edges, "link"],
             ["Texts", stats.texts, "file"],
             ["Vectors", stats.vectors, "graph"],
             ["Dimension", stats.vector_dimension ?? "—", "target"],
@@ -131,11 +126,11 @@ export function OverviewView() {
                 <Bars counts={stats.node_labels} />
               </section>
               <section>
-                <h3>Edge labels</h3>
+                <h3>Fact types</h3>
                 <Bars counts={stats.edge_labels} />
               </section>
             </div>
-          </section>
+          </InspectorPanel>
         )}
       </div>
     </div>

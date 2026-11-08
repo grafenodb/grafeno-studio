@@ -114,8 +114,12 @@
 
 ### Phase 5 — Validation
 
-- Run type checking, production build and the existing test suite.
-- Exercise the real shell, theme switch, namespace tree, splitters, scripts,
-  explorer and graph at 1920×1080, 1440×900, 1366×768 and 1024×768.
-- Validate the shared build in web and Tauri before packaging installers.
+- **Validated:** the Studio production build and all 58 Studio tests pass;
+  Rust formatting and all 12 Desktop tests pass as well.
+- **Exercised:** the real shell, themes, namespace tree, splitters, scripts,
+  Explorer and Graph at 1920×1080, 1440×900, 1366×768 and 1024×768.
+- **Confirmed:** Web and Tauri consume the same production Studio bundle;
+  native installer creation remains the following release step.
+- See [`../qa/workspace-validation.md`](../qa/workspace-validation.md) for the
+  validation matrix, environment boundary and packaging handoff.
 

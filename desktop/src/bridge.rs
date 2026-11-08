@@ -141,13 +141,23 @@ mod tests {
         let (url, server) = echo_once();
         let binary: Vec<u8> = (0..=255).collect();
         let headers = BTreeMap::from([("authorization".to_owned(), "Bearer t".to_owned())]);
-        let reply = send(&agent(), "POST", &format!("{url}/bytes"), &headers, binary.clone()).unwrap();
+        let reply = send(
+            &agent(),
+            "POST",
+            &format!("{url}/bytes"),
+            &headers,
+            binary.clone(),
+        )
+        .unwrap();
         assert_eq!(reply.status, 418, "errors are answers, not failures");
         assert_eq!(reply.headers["content-type"], "application/octet-stream");
         assert_eq!(bytes(&reply), binary);
         let head = server.join().unwrap();
         assert!(head.starts_with("POST /bytes HTTP/1.1"));
-        assert!(head.to_ascii_lowercase().contains("authorization: bearer t"));
+        assert!(
+            head.to_ascii_lowercase()
+                .contains("authorization: bearer t")
+        );
     }
 
     #[test]
@@ -165,7 +175,10 @@ mod tests {
         assert_eq!(request_body(None, Some(encoded.clone())).unwrap(), binary);
         assert!(request_body(Some("text".into()), Some(encoded)).is_err());
         assert!(request_body(None, Some("not base64!".into())).is_err());
-        assert_eq!(request_body(Some("café".into()), None).unwrap(), "café".as_bytes());
+        assert_eq!(
+            request_body(Some("café".into()), None).unwrap(),
+            "café".as_bytes()
+        );
         let reply = Reply::new(200, BTreeMap::new(), binary.clone());
         assert_eq!(bytes(&reply), binary);
         let json = serde_json::to_value(&reply).unwrap();
@@ -173,6 +186,11 @@ mod tests {
         assert_eq!(json["body"], "");
         let text = Reply::new(200, BTreeMap::new(), "café".as_bytes().to_vec());
         assert_eq!(text.body, "café");
-        assert!(serde_json::to_value(text).unwrap().get("bodyBase64").is_none());
+        assert!(
+            serde_json::to_value(text)
+                .unwrap()
+                .get("bodyBase64")
+                .is_none()
+        );
     }
 }

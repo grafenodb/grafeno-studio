@@ -82,6 +82,9 @@ engine's repository (engine phase 15).
   inspectors refine Graph Explorer without increasing its bounded loading.
 - **One Overview document**: switching namespaces updates the global Overview
   tab instead of accumulating one Overview tab for every namespace.
+- **Workspace validation**: the shared production bundle passes the complete
+  Studio and Desktop test suites and the responsive shell matrix from
+  1920×1080 through 1024×768 before native installer packaging.
 - **Installers**: Windows (`.exe`, `.msi`, for the current user), Linux
   (`.deb`, `.rpm`, `.AppImage`); none carries an engine or installs a
   service. The Studio's web build as a `.zip`, for a web server.

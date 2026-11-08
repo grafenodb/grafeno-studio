@@ -157,13 +157,17 @@ fn open_path(app: &AppHandle, label: &str, path: PathBuf) -> Result<SessionInfo,
 fn new_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     let desktop = app.state::<Desktop>();
     let n = desktop.windows.fetch_add(1, Ordering::Relaxed);
-    tauri::WebviewWindowBuilder::new(app, format!("main-{n}"), tauri::WebviewUrl::App("index.html".into()))
-        .title("Grafeno")
-        .inner_size(1280.0, 840.0)
-        .min_inner_size(900.0, 600.0)
-        .background_color(tauri::window::Color(5, 7, 10, 255))
-        .disable_drag_drop_handler()
-        .build()
+    tauri::WebviewWindowBuilder::new(
+        app,
+        format!("main-{n}"),
+        tauri::WebviewUrl::App("index.html".into()),
+    )
+    .title("Grafeno")
+    .inner_size(1280.0, 840.0)
+    .min_inner_size(900.0, 600.0)
+    .background_color(tauri::window::Color(5, 7, 10, 255))
+    .disable_drag_drop_handler()
+    .build()
 }
 
 /// The window menus and second launches act on: the focused one.
@@ -194,11 +198,18 @@ fn session(window: WebviewWindow, desktop: State<'_, Desktop>) -> Option<Session
 /// time: it may have been installed since).
 #[tauri::command]
 async fn engine_info() -> Option<EngineInfo> {
-    tokio::task::spawn_blocking(engine::find_engine).await.ok().flatten()
+    tokio::task::spawn_blocking(engine::find_engine)
+        .await
+        .ok()
+        .flatten()
 }
 
 #[tauri::command]
-async fn open_database(app: AppHandle, window: WebviewWindow, path: String) -> Result<SessionInfo, String> {
+async fn open_database(
+    app: AppHandle,
+    window: WebviewWindow,
+    path: String,
+) -> Result<SessionInfo, String> {
     let label = window.label().to_owned();
     tokio::task::spawn_blocking(move || open_path(&app, &label, PathBuf::from(path)))
         .await
@@ -207,14 +218,20 @@ async fn open_database(app: AppHandle, window: WebviewWindow, path: String) -> R
 
 #[tauri::command]
 fn close_database(app: AppHandle, window: WebviewWindow, desktop: State<'_, Desktop>) {
-    let closed = desktop.sessions.lock().expect("not poisoned").remove(window.label());
+    let closed = desktop
+        .sessions
+        .lock()
+        .expect("not poisoned")
+        .remove(window.label());
     stop_later(closed.into_iter().collect());
     set_title(&app, window.label(), "Grafeno");
 }
 
 #[tauri::command]
 fn open_window(app: AppHandle) -> Result<(), String> {
-    new_window(&app).map(|_| ()).map_err(|error| error.to_string())
+    new_window(&app)
+        .map(|_| ())
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -300,7 +317,8 @@ async fn write_bytes(path: String, bytes_base64: String) -> Result<(), String> {
         .create_new(true)
         .open(&path)
         .map_err(|error| format!("cannot create {path}: {error}"))?;
-    std::io::Write::write_all(&mut file, &bytes).map_err(|error| format!("cannot write {path}: {error}"))
+    std::io::Write::write_all(&mut file, &bytes)
+        .map_err(|error| format!("cannot write {path}: {error}"))
 }
 
 /// Recovers a backup into a new file with the installed engine (`grafeno
@@ -581,7 +599,11 @@ fn main() {
             // A closed window's engine stops.
             if let WindowEvent::Destroyed = event {
                 let desktop = window.state::<Desktop>();
-                let closed = desktop.sessions.lock().expect("not poisoned").remove(window.label());
+                let closed = desktop
+                    .sessions
+                    .lock()
+                    .expect("not poisoned")
+                    .remove(window.label());
                 stop_later(closed.into_iter().collect());
             }
         })

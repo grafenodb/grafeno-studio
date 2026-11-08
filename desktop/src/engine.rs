@@ -42,7 +42,11 @@ pub struct EngineInfo {
 }
 
 fn program() -> &'static str {
-    if cfg!(windows) { "grafeno.exe" } else { "grafeno" }
+    if cfg!(windows) {
+        "grafeno.exe"
+    } else {
+        "grafeno"
+    }
 }
 
 /// Where an installed engine may be, in order: `GRAFENO_BIN`, the `PATH`,
@@ -62,7 +66,12 @@ pub fn candidates() -> Vec<PathBuf> {
             }
         }
         if let Some(dir) = std::env::var_os("LOCALAPPDATA") {
-            found.push(PathBuf::from(dir).join("Programs").join("Grafeno").join("grafeno.exe"));
+            found.push(
+                PathBuf::from(dir)
+                    .join("Programs")
+                    .join("Grafeno")
+                    .join("grafeno.exe"),
+            );
         }
     } else {
         found.push(PathBuf::from("/usr/bin/grafeno"));
@@ -81,7 +90,10 @@ pub fn find_engine() -> Option<EngineInfo> {
             return None;
         }
         let mut command = Command::new(&path);
-        command.arg("--version").stdin(Stdio::null()).stderr(Stdio::null());
+        command
+            .arg("--version")
+            .stdin(Stdio::null())
+            .stderr(Stdio::null());
         hide_window(&mut command);
         let output = command.output().ok()?;
         let version = String::from_utf8_lossy(&output.stdout).trim().to_owned();
@@ -119,7 +131,10 @@ fn new_token() -> Result<String, String> {
     const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     let mut bytes = [0u8; 43];
     getrandom::fill(&mut bytes).map_err(|error| format!("no random source: {error}"))?;
-    Ok(bytes.iter().map(|b| ALPHABET[(*b & 63) as usize] as char).collect())
+    Ok(bytes
+        .iter()
+        .map(|b| ALPHABET[(*b & 63) as usize] as char)
+        .collect())
 }
 
 /// One database file served by an engine started for it.
@@ -143,7 +158,14 @@ impl LocalEngine {
         let token = new_token()?;
         let mut command = Command::new(&engine.path);
         command
-            .args(["serve", "--stop-with-stdin", "--addr", "127.0.0.1:0", "--token", &token])
+            .args([
+                "serve",
+                "--stop-with-stdin",
+                "--addr",
+                "127.0.0.1:0",
+                "--token",
+                &token,
+            ])
             .arg("--db")
             .arg(path)
             .stdin(Stdio::piped())
@@ -264,7 +286,10 @@ fn refusal(path: &Path, output: &[String]) -> String {
         format!(
             "the engine cannot open {}: {}",
             path.display(),
-            text.lines().last().unwrap_or("").trim_start_matches("grafeno: ")
+            text.lines()
+                .last()
+                .unwrap_or("")
+                .trim_start_matches("grafeno: ")
         )
     }
 }
@@ -326,17 +351,35 @@ mod with_the_engine {
         find_engine().expect("these tests need the engine: set GRAFENO_BIN to grafeno's binary")
     }
 
-    fn call(session: &LocalEngine, method: &str, path: &str, body: &str, auth: bool) -> (u16, serde_json::Value) {
-        let mut headers = BTreeMap::from([("content-type".to_owned(), "application/json".to_owned())]);
+    fn call(
+        session: &LocalEngine,
+        method: &str,
+        path: &str,
+        body: &str,
+        auth: bool,
+    ) -> (u16, serde_json::Value) {
+        let mut headers =
+            BTreeMap::from([("content-type".to_owned(), "application/json".to_owned())]);
         if auth {
             headers.insert("authorization".into(), format!("Bearer {}", session.token));
         }
-        let reply = send(&agent(), method, &format!("{}{path}", session.url), &headers, body.as_bytes().to_vec()).unwrap();
-        (reply.status, serde_json::from_str(&reply.body).unwrap_or(serde_json::Value::Null))
+        let reply = send(
+            &agent(),
+            method,
+            &format!("{}{path}", session.url),
+            &headers,
+            body.as_bytes().to_vec(),
+        )
+        .unwrap();
+        (
+            reply.status,
+            serde_json::from_str(&reply.body).unwrap_or(serde_json::Value::Null),
+        )
     }
 
     fn temp_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("grafeno-desktop-{name}-{}", new_token().unwrap()));
+        let dir =
+            std::env::temp_dir().join(format!("grafeno-desktop-{name}-{}", new_token().unwrap()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -347,7 +390,11 @@ mod with_the_engine {
         let dir = temp_dir("open");
         let path = dir.join("memory.redb");
         let session = LocalEngine::start(&engine, &path).unwrap();
-        assert!(session.url.starts_with("http://127.0.0.1:"), "loopback only: {}", session.url);
+        assert!(
+            session.url.starts_with("http://127.0.0.1:"),
+            "loopback only: {}",
+            session.url
+        );
         assert!(path.exists(), "a new file was created");
 
         // The engine answers only with this session's token.
@@ -355,20 +402,44 @@ mod with_the_engine {
         let (status, about) = call(&session, "GET", "/v1/about", "", false);
         assert_eq!(status, 200);
         assert_eq!(about["product"], "grafeno");
-        let (status, _) = call(&session, "POST", "/v1/namespaces", r#"{"name":"lab"}"#, true);
+        let (status, _) = call(
+            &session,
+            "POST",
+            "/v1/namespaces",
+            r#"{"name":"lab"}"#,
+            true,
+        );
         assert_eq!(status, 201);
-        let (status, _) = call(&session, "POST", "/v1/lab/query", r#"{"query":"CREATE (:Person {name: 'Ana'})"}"#, true);
+        let (status, _) = call(
+            &session,
+            "POST",
+            "/v1/lab/query",
+            r#"{"query":"CREATE (:Person {name: 'Ana'})"}"#,
+            true,
+        );
         assert_eq!(status, 200);
 
         // A backup through the API, recovered into a new file by `grafeno restore`.
         let mut headers = BTreeMap::new();
-        headers.insert("authorization".to_owned(), format!("Bearer {}", session.token));
-        let backup = send(&agent(), "GET", &format!("{}/v1/backup", session.url), &headers, Vec::new()).unwrap();
+        headers.insert(
+            "authorization".to_owned(),
+            format!("Bearer {}", session.token),
+        );
+        let backup = send(
+            &agent(),
+            "GET",
+            &format!("{}/v1/backup", session.url),
+            &headers,
+            Vec::new(),
+        )
+        .unwrap();
         assert_eq!(backup.status, 200);
         let bytes = match backup.body_base64 {
             Some(encoded) => {
                 use base64::Engine as _;
-                base64::engine::general_purpose::STANDARD.decode(encoded).unwrap()
+                base64::engine::general_purpose::STANDARD
+                    .decode(encoded)
+                    .unwrap()
             }
             None => backup.body.into_bytes(),
         };
@@ -376,20 +447,38 @@ mod with_the_engine {
         std::fs::write(&backup_file, &bytes).unwrap();
         let restored = dir.join("restored.redb");
         assert!(restore(&engine, &backup_file, &restored).unwrap() > 0);
-        assert!(restore(&engine, &backup_file, &restored).unwrap_err().contains("exists"));
+        assert!(
+            restore(&engine, &backup_file, &restored)
+                .unwrap_err()
+                .contains("exists")
+        );
 
         // The file is held: a second engine (another window) is refused.
-        let refused = LocalEngine::start(&engine, &path).err().expect("the file is in use");
+        let refused = LocalEngine::start(&engine, &path)
+            .err()
+            .expect("the file is in use");
         assert!(refused.contains("open in another program"), "{refused}");
 
         // Closing stops the engine cleanly: the file opens again at once,
         // with what was written.
         session.stop();
         let again = LocalEngine::start(&engine, &path).unwrap();
-        let (_, rows) = call(&again, "POST", "/v1/lab/query", r#"{"query":"MATCH (p:Person) RETURN p.name"}"#, true);
+        let (_, rows) = call(
+            &again,
+            "POST",
+            "/v1/lab/query",
+            r#"{"query":"MATCH (p:Person) RETURN p.name"}"#,
+            true,
+        );
         assert_eq!(rows["rows"], serde_json::json!([["Ana"]]));
         let restored_session = LocalEngine::start(&engine, &restored).unwrap();
-        let (_, rows) = call(&restored_session, "POST", "/v1/lab/query", r#"{"query":"MATCH (p:Person) RETURN count(p)"}"#, true);
+        let (_, rows) = call(
+            &restored_session,
+            "POST",
+            "/v1/lab/query",
+            r#"{"query":"MATCH (p:Person) RETURN count(p)"}"#,
+            true,
+        );
         assert_eq!(rows["rows"], serde_json::json!([[1]]));
         drop(again);
         drop(restored_session);
@@ -404,8 +493,17 @@ mod with_the_engine {
         let url = session.url.clone();
         // As when the window closes, or the app ends.
         drop(session);
-        let reached = send(&agent(), "GET", &format!("{url}/health"), &BTreeMap::new(), Vec::new());
-        assert!(reached.is_err(), "the engine still answers after its session ended");
+        let reached = send(
+            &agent(),
+            "GET",
+            &format!("{url}/health"),
+            &BTreeMap::new(),
+            Vec::new(),
+        );
+        assert!(
+            reached.is_err(),
+            "the engine still answers after its session ended"
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -416,7 +514,10 @@ mod with_the_engine {
         let path = dir.join("not-a-database.redb");
         std::fs::write(&path, b"this is not a redb file at all, not even close").unwrap();
         let error = LocalEngine::start(&engine, &path).err().expect("refused");
-        assert!(error.contains("cannot open") || error.contains("stopped before"), "{error}");
+        assert!(
+            error.contains("cannot open") || error.contains("stopped before"),
+            "{error}"
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
@@ -427,11 +528,17 @@ mod tests {
 
     #[test]
     fn internal_addresses() {
-        assert_eq!(local_path("http://grafeno.local/session/a/v1/x"), Some("/session/a/v1/x"));
+        assert_eq!(
+            local_path("http://grafeno.local/session/a/v1/x"),
+            Some("/session/a/v1/x")
+        );
         assert_eq!(local_path("http://grafeno.local"), Some(""));
         assert_eq!(local_path("http://grafeno.localhost/x"), None);
         assert_eq!(local_path("http://127.0.0.1:7810/v1"), None);
-        assert_eq!(session_path("/session/ab/v1/about").unwrap(), ("ab", "/v1/about".to_owned()));
+        assert_eq!(
+            session_path("/session/ab/v1/about").unwrap(),
+            ("ab", "/v1/about".to_owned())
+        );
         assert_eq!(session_path("/session/ab").unwrap(), ("ab", "/".to_owned()));
         assert!(session_path("/v1/about").is_err());
     }
@@ -450,15 +557,31 @@ mod tests {
         if let Some(bin) = std::env::var_os("GRAFENO_BIN") {
             assert_eq!(list[0], PathBuf::from(bin));
         }
-        let installed = if cfg!(windows) { "Grafeno" } else { "/usr/bin/grafeno" };
-        assert!(list.iter().any(|path| path.to_string_lossy().contains(installed)));
+        let installed = if cfg!(windows) {
+            "Grafeno"
+        } else {
+            "/usr/bin/grafeno"
+        };
+        assert!(
+            list.iter()
+                .any(|path| path.to_string_lossy().contains(installed))
+        );
     }
 
     #[test]
     fn refusals_say_why() {
         let path = Path::new("/data/memory.redb");
-        assert!(refusal(path, &["grafeno: Database already open. Cannot acquire lock.".into()]).contains("open in another program"));
+        assert!(
+            refusal(
+                path,
+                &["grafeno: Database already open. Cannot acquire lock.".into()]
+            )
+            .contains("open in another program")
+        );
         assert!(refusal(path, &[]).contains("stopped before serving"));
-        assert!(refusal(path, &["grafeno: invalid input: newer layout".into()]).ends_with("invalid input: newer layout"));
+        assert!(
+            refusal(path, &["grafeno: invalid input: newer layout".into()])
+                .ends_with("invalid input: newer layout")
+        );
     }
 }

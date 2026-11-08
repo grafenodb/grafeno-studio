@@ -5400,8 +5400,8 @@ button.primary {
   }
 }
 
-/* Final cascade for the two-row IDE chrome. Keep this after legacy shell
-   rules while the old selectors are removed incrementally. */
+/* Final cascade for the two-row IDE chrome: product identity first,
+   full-width module navigation second. */
 :root {
   --bar: 82px;
 }
@@ -5413,14 +5413,22 @@ button.primary {
 }
 
 .topbar-brand {
-  grid-column: 1;
+  grid-column: 1 / -1;
   grid-row: 1;
   padding: 3px 11px;
 }
 
-.application-menus {
-  grid-column: 2;
-  grid-row: 1;
+.collapsed .topbar-brand {
+  justify-content: flex-start;
+  padding: 3px 11px;
+}
+
+.collapsed .topbar-brand .brand-text {
+  display: inline;
+}
+
+.collapsed .sidebar-search {
+  display: none;
 }
 
 .toolbar-nav {
@@ -5494,14 +5502,9 @@ button.primary {
 
   .topbar-brand {
     display: flex;
-    grid-column: 1;
+    grid-column: 1 / -1;
     grid-row: 1;
     justify-content: flex-start;
-  }
-
-  .application-menus {
-    grid-column: 2;
-    grid-row: 1;
   }
 
   .toolbar-nav {
@@ -5512,16 +5515,12 @@ button.primary {
 }
 
 @media (max-width: 560px) {
-  .topbar {
-    grid-template-columns: 44px minmax(0, 1fr);
-  }
-
   .topbar-brand {
-    justify-content: center;
-    padding-inline: 3px;
+    justify-content: flex-start;
+    padding-inline: 9px;
   }
 
   .topbar-brand .brand-text {
-    display: none;
+    display: inline;
   }
 }

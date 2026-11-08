@@ -138,11 +138,10 @@
 
 ### Phase 7 — IDE refinement
 
-- **Implemented:** compact File, Edit, View, Query, Tools and Help menus with
-  real actions, disabled states and keyboard navigation.
-- **Reorganized:** the full-width module navigation occupies its own row;
-  creation, connection, version and disconnect controls no longer compete
-  with module navigation.
+- **Refined:** the traditional File, Edit, View, Query, Tools and Help row was
+  removed; the left-aligned Grafeno Studio identity now owns that full row.
+- **Reorganized:** the full-width module navigation occupies its own row and
+  remains independent from product identity and connection status.
 - **Refined:** dark mode uses neutral IDE surfaces while Light remains intact
   and System follows live operating-system preference changes.
 - **Improved:** centered theme controls, natural-height Overview content,

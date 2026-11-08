@@ -362,132 +362,6 @@ function NamespaceMenu() {
   );
 }
 
-interface ApplicationMenuAction {
-  label: string;
-  run: () => void;
-  shortcut?: string;
-  checked?: boolean;
-  disabled?: boolean | (() => boolean);
-  danger?: boolean;
-}
-
-interface ApplicationMenuDefinition {
-  label: string;
-  groups: ApplicationMenuAction[][];
-}
-
-/** The in-workspace menu bar, shared by the browser and Desktop builds. */
-function ApplicationMenus({ menus }: { menus: ApplicationMenuDefinition[] }) {
-  const [open, setOpen] = useState<string | null>(null);
-  const bar = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: MouseEvent) => !bar.current?.contains(event.target as Node) && setOpen(null);
-    const escape = (event: KeyboardEvent) => event.key === "Escape" && setOpen(null);
-    window.addEventListener("mousedown", close);
-    window.addEventListener("keydown", escape);
-    return () => {
-      window.removeEventListener("mousedown", close);
-      window.removeEventListener("keydown", escape);
-    };
-  }, [open]);
-
-  const focusMenu = (label: string) => {
-    window.requestAnimationFrame(() => {
-      const root = bar.current?.querySelector<HTMLElement>(`[data-application-menu="${label}"]`);
-      root?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')?.focus();
-    });
-  };
-  const moveTop = (label: string, direction: number) => {
-    const index = menus.findIndex((menu) => menu.label === label);
-    const next = menus[(index + direction + menus.length) % menus.length];
-    setOpen(next.label);
-    bar.current?.querySelector<HTMLButtonElement>(`[data-menu-trigger="${next.label}"]`)?.focus();
-  };
-
-  return (
-    <div className="application-menus" role="menubar" aria-label="Application menu" ref={bar}>
-      {menus.map((menu) => (
-        <div className="application-menu" data-application-menu={menu.label} key={menu.label}>
-          <button
-            className={open === menu.label ? "application-menu-trigger active" : "application-menu-trigger"}
-            type="button"
-            role="menuitem"
-            data-menu-trigger={menu.label}
-            aria-haspopup="menu"
-            aria-expanded={open === menu.label}
-            onClick={() => setOpen((value) => (value === menu.label ? null : menu.label))}
-            onMouseEnter={() => open && setOpen(menu.label)}
-            onKeyDown={(event) => {
-              if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-                event.preventDefault();
-                moveTop(menu.label, event.key === "ArrowRight" ? 1 : -1);
-              } else if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                setOpen(menu.label);
-                focusMenu(menu.label);
-              }
-            }}
-          >
-            {menu.label}
-          </button>
-          {open === menu.label && (
-            <div
-              className="application-menu-popup"
-              role="menu"
-              aria-label={menu.label}
-              onKeyDown={(event) => {
-                const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])')];
-                const index = items.indexOf(document.activeElement as HTMLButtonElement);
-                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-                  event.preventDefault();
-                  items[(index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
-                } else if (event.key === "Home" || event.key === "End") {
-                  event.preventDefault();
-                  items[event.key === "Home" ? 0 : items.length - 1]?.focus();
-                } else if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-                  event.preventDefault();
-                  moveTop(menu.label, event.key === "ArrowRight" ? 1 : -1);
-                } else if (event.key === "Escape") {
-                  event.preventDefault();
-                  setOpen(null);
-                  bar.current?.querySelector<HTMLButtonElement>(`[data-menu-trigger="${menu.label}"]`)?.focus();
-                }
-              }}
-            >
-              {menu.groups.map((group, groupIndex) => (
-                <div className="application-menu-group" key={groupIndex}>
-                  {group.map((item) => {
-                    const disabled = typeof item.disabled === "function" ? item.disabled() : item.disabled;
-                    return (
-                      <button
-                        className={`application-menu-item ${item.danger ? "danger-item" : ""}`.trim()}
-                        type="button"
-                        role="menuitem"
-                        disabled={disabled}
-                        key={item.label}
-                        onClick={() => {
-                          setOpen(null);
-                          item.run();
-                        }}
-                      >
-                        <span className="application-menu-check" aria-hidden="true">{item.checked ? "✓" : ""}</span>
-                        <span>{item.label}</span>
-                        {item.shortcut && <kbd>{item.shortcut}</kbd>}
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /** Ctrl+K: jump to a view, run an action or open a node. */
 function CommandPalette({ onClose }: { onClose: () => void }) {
   const { newNode, newEdge, namespaces, setNamespace, supports } = useStudio();
@@ -590,9 +464,6 @@ export function App() {
   const [nodeForm, setNodeForm] = useState<NewNodeOptions | null>(null);
   const [edgeForm, setEdgeForm] = useState<NewEdgeOptions | null>(null);
   const [palette, setPalette] = useState(false);
-  const [aboutOpen, setAboutOpen] = useState(false);
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [queryRunning, setQueryRunning] = useState(false);
   const [collapsed, setCollapsed] = useState(() => readSetting("grafeno.studio.collapsed", "") === "1");
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const value = Number(readSetting("grafeno.studio.sidebar-width", "224"));
@@ -709,12 +580,6 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  useEffect(() => {
-    const state = (event: Event) => setQueryRunning(Boolean((event as CustomEvent<{ running: boolean }>).detail?.running));
-    window.addEventListener("grafeno:query-state", state);
-    return () => window.removeEventListener("grafeno:query-state", state);
   }, []);
 
   const client = useMemo(() => (connection ? clientFor(connection) : null), [connection]);
@@ -964,140 +829,6 @@ export function App() {
     confirming?.resolve(ok);
     setConfirming(null);
   };
-  const disconnect = () => {
-    if (local) {
-      void closeLocal();
-      return;
-    }
-    if (connection.refresh) void clientFor(connection).signOut().catch(() => undefined);
-    forgetConnection();
-    setConnection(null);
-  };
-  const openExternal = (url: string) => {
-    if (isDesktop) void desktop.openExternal(url);
-    else window.open(url, "_blank", "noopener,noreferrer");
-  };
-  const editEnabled = (command: string) => {
-    try {
-      return document.queryCommandEnabled(command);
-    } catch {
-      return false;
-    }
-  };
-  const edit = (command: string) => {
-    try {
-      document.execCommand(command);
-    } catch {
-      // Browser editing commands are intentionally unavailable outside an editor.
-    }
-  };
-  const newScript = () => {
-    go("scripts");
-    window.setTimeout(() => window.dispatchEvent(new CustomEvent("grafeno:query-new")), 50);
-  };
-  const query = (name: "run" | "run-all" | "stop") => window.dispatchEvent(new CustomEvent(`grafeno:query-${name}`));
-  const resetLayout = () => {
-    setCollapsed(false);
-    setSidebarWidth(224);
-    writeSetting("grafeno.studio.collapsed", "0");
-    writeSetting("grafeno.studio.sidebar-width", "224");
-    window.dispatchEvent(new CustomEvent("grafeno:layout-reset"));
-  };
-  const menus: ApplicationMenuDefinition[] = [
-    {
-      label: "File",
-      groups: [
-        [
-          { label: "New node…", run: () => setNodeForm({ onCreated: (id) => go("explorer", id) }) },
-          { label: "New fact…", run: () => setEdgeForm({}) },
-          { label: "New script", run: newScript, shortcut: "Ctrl+Shift+N" },
-        ],
-        ...(isDesktop
-          ? [[
-              { label: "New database…", run: () => void desktop.pickDatabase(true).then((path) => { if (path) void openLocal(path); }) },
-              { label: "Open database…", run: () => void desktop.pickDatabase(false).then((path) => { if (path) void openLocal(path); }), shortcut: "Ctrl+O" },
-            ]]
-          : []),
-        [
-          { label: "Close tab", run: () => closeDocument(activeDocument), shortcut: "Ctrl+W" },
-          { label: local ? "Close database" : connection.user ? "Sign out" : "Disconnect", run: disconnect, danger: true },
-        ],
-      ],
-    },
-    {
-      label: "Edit",
-      groups: [
-        [
-          { label: "Undo", run: () => edit("undo"), shortcut: "Ctrl+Z", disabled: () => !editEnabled("undo") },
-          { label: "Redo", run: () => edit("redo"), shortcut: "Ctrl+Y", disabled: () => !editEnabled("redo") },
-        ],
-        [
-          { label: "Cut", run: () => edit("cut"), shortcut: "Ctrl+X", disabled: () => !editEnabled("cut") },
-          { label: "Copy", run: () => edit("copy"), shortcut: "Ctrl+C", disabled: () => !editEnabled("copy") },
-          { label: "Paste", run: () => edit("paste"), shortcut: "Ctrl+V", disabled: () => !editEnabled("paste") },
-        ],
-        [{ label: "Find or jump to…", run: () => setPalette(true), shortcut: "Ctrl+K" }],
-      ],
-    },
-    {
-      label: "View",
-      groups: [
-        [
-          {
-            label: collapsed ? "Show namespace explorer" : "Hide namespace explorer",
-            run: () => {
-              setCollapsed((value) => !value);
-              writeSetting("grafeno.studio.collapsed", collapsed ? "0" : "1");
-            },
-          },
-          { label: "Command palette…", run: () => setPalette(true), shortcut: "Ctrl+K" },
-          { label: "Reset layout", run: resetLayout },
-        ],
-        [
-          { label: "Light theme", run: () => setTheme("light"), checked: theme === "light" },
-          { label: "Dark theme", run: () => setTheme("dark"), checked: theme === "dark" },
-          { label: "System theme", run: () => setTheme("system"), checked: theme === "system" },
-        ],
-        ...(document.fullscreenEnabled
-          ? [[{ label: document.fullscreenElement ? "Exit fullscreen" : "Fullscreen", run: () => void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()), shortcut: "F11" }]]
-          : []),
-      ],
-    },
-    {
-      label: "Query",
-      groups: [
-        [{ label: "New query", run: newScript, shortcut: "Ctrl+Shift+N" }],
-        [
-          { label: "Run query", run: () => query("run"), shortcut: "Ctrl+Enter", disabled: view !== "scripts" || queryRunning },
-          { label: "Run all", run: () => query("run-all"), shortcut: "F5", disabled: view !== "scripts" || queryRunning },
-          { label: "Stop query", run: () => query("stop"), disabled: view !== "scripts" || !queryRunning },
-        ],
-      ],
-    },
-    {
-      label: "Tools",
-      groups: [[
-        { label: "Search", run: () => go("search") },
-        { label: "Administration", run: () => go("admin") },
-        ...(studio.supports("cluster") ? [{ label: "Cluster", run: () => go("cluster") }] : []),
-        ...(studio.supports("roles") ? [{ label: "Access control", run: () => go("access") }] : []),
-      ]],
-    },
-    {
-      label: "Help",
-      groups: [
-        [
-          { label: "Grafeno documentation", run: () => openExternal("https://github.com/grafenodb/grafeno/tree/main/docs") },
-          { label: "Query language reference", run: () => openExternal("https://github.com/grafenodb/grafeno/blob/main/docs/query-language.md") },
-        ],
-        [
-          { label: "Keyboard shortcuts", run: () => setShortcutsOpen(true) },
-          { label: "About Grafeno Studio", run: () => setAboutOpen(true) },
-        ],
-      ],
-    },
-  ];
-
   return (
     <StudioContext.Provider value={studio}>
       <div
@@ -1112,7 +843,6 @@ export function App() {
               Grafeno <span>Studio</span>
             </span>
           </a>
-          <ApplicationMenus menus={menus} />
           <nav className="toolbar-nav" aria-label="Studio tools">
             {VIEWS.filter((item) => !item.needs || studio.supports(item.needs)).map((item) => (
               <a key={item.id} href={`#/${item.id}`} className={item.id === view ? "toolbar-item active" : "toolbar-item"} title={item.hint}>
@@ -1274,25 +1004,6 @@ export function App() {
       {nodeForm && <NodeForm options={nodeForm} onClose={() => setNodeForm(null)} />}
       {edgeForm && <EdgeForm options={edgeForm} onClose={() => setEdgeForm(null)} />}
       {palette && <CommandPalette onClose={() => setPalette(false)} />}
-      {shortcutsOpen && (
-        <Modal title="Keyboard shortcuts" onClose={() => setShortcutsOpen(false)}>
-          <div className="shortcut-list">
-            <span>Command palette</span><kbd>Ctrl K</kbd>
-            <span>Close active tab</span><kbd>Ctrl W</kbd>
-            <span>Previous / next tab</span><kbd>Ctrl PageUp / PageDown</kbd>
-            <span>Run query</span><kbd>Ctrl Enter</kbd>
-            <span>Run all queries</span><kbd>F5</kbd>
-          </div>
-        </Modal>
-      )}
-      {aboutOpen && (
-        <Modal title="About Grafeno Studio" onClose={() => setAboutOpen(false)}>
-          <div className="about-studio">
-            <Logo size={44} />
-            <div><strong>Grafeno Studio</strong><p className="muted">Graph Database IDE · Engine {version}</p></div>
-          </div>
-        </Modal>
-      )}
       {confirming && (
         <Modal
           title={confirming.title}

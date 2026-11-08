@@ -13,8 +13,8 @@ npm run build --prefix desktop -- --bundles nsis,msi
 
 | Package | Size | SHA-256 |
 | --- | ---: | --- |
-| `Grafeno Desktop_0.2.0_x64-setup.exe` | 4,128,956 bytes | `AE3DF278D615882A145728BDC6F90D21FE0E7E1BB6ACC2DDCEE008F9AAD6F864` |
-| `Grafeno Desktop_0.2.0_x64_en-US.msi` | 5,627,904 bytes | `DBE64DA5A39FFB2EE9E9D897731414A2C4AD15196FAC5C1497F3654F3077143F` |
+| `Grafeno Desktop_0.2.0_x64-setup.exe` | 4,131,823 bytes | `3C03EEB8D3B7EA4D518820CE673923AC33769009AE1E6EC85F4013BB2AD58007` |
+| `Grafeno Desktop_0.2.0_x64_en-US.msi` | 5,627,904 bytes | `EA5C00EC234C7B9862CA1484DAD1B4821B06F8F554754539C5FDFF0D3C8A7D68` |
 
 Both packages were generated successfully by Tauri 2. The local artifacts
 are unsigned because no release certificate was supplied. The release
@@ -31,8 +31,8 @@ docker buildx build -f desktop/packaging/Dockerfile --output dist/desktop .
 
 | Package | Size | SHA-256 |
 | --- | ---: | --- |
-| `Grafeno Desktop_0.2.0_amd64.deb` | 7,326,236 bytes | `6934A644A79FF829E412D87CE5D6CD8AF6C61980BFB22348CBB902828EA1B5E8` |
-| `Grafeno Desktop-0.2.0-1.x86_64.rpm` | 7,329,426 bytes | `1956CFA067877583072F2FA53CEC44C5BF7BE238A6B89214E9102226B4F7E44D` |
+| `Grafeno Desktop_0.2.0_amd64.deb` | 7,327,554 bytes | `95E7CE89F13BF01963B3BD7DFA3BD32577901F0247E62EF42A9FECF8D9398B4C` |
+| `Grafeno Desktop-0.2.0-1.x86_64.rpm` | 7,331,009 bytes | `DACBB4F72477E20F0B20AB887E957398CB2C96E006CC197E2C62E3452A3AF696` |
 
 Package metadata reports `grafeno-desktop` 0.2.0 for `amd64`/`x86_64`.
 Both packages contain `/usr/bin/grafeno-desktop`, the desktop entry and the

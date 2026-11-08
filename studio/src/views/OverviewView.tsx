@@ -39,7 +39,7 @@ export function OverviewView() {
       <div className="page-head overview-head">
         <div className="overview-heading">
           <h1>Overview</h1>
-          <p className="muted">A live view of “{namespace}” and the structure it holds.</p>
+          <p className="muted">{namespace}</p>
         </div>
         <div className="row overview-actions">
           <button onClick={() => newNode({ onCreated: (id) => go("explorer", id) })}>
@@ -54,31 +54,11 @@ export function OverviewView() {
         </div>
       </div>
       {error && <div className="error">{error}</div>}
-      {stats && (
-        <section className="metric-ribbon" aria-label="Namespace totals">
-          {[
-            ["Nodes", stats.nodes, "node"],
-            ["Edges", stats.edges, "link"],
-            ["Texts", stats.texts, "file"],
-            ["Vectors", stats.vectors, "graph"],
-            ["Dimension", stats.vector_dimension ?? "—", "target"],
-          ].map(([label, value, icon], index) => (
-            <article key={label} className={index < 2 ? "metric primary-metric" : "metric"}>
-              <Icon name={icon as IconName} size={16} />
-              <div>
-                <span className="metric-label">{label}</span>
-                <strong className="metric-value">{typeof value === "number" ? value.toLocaleString() : value}</strong>
-              </div>
-            </article>
-          ))}
-        </section>
-      )}
       <div className="overview-grid">
         <section className="panel overview-namespaces">
           <header className="panel-heading">
             <div>
               <h2>Namespaces</h2>
-              <p className="muted small">Choose the graph you want to inspect.</p>
             </div>
             <span className="panel-count">{namespaces.length}</span>
           </header>
@@ -122,10 +102,29 @@ export function OverviewView() {
           <section className="panel overview-composition">
             <header className="panel-heading">
               <div>
-                <h2>Graph composition</h2>
-                <p className="muted small">The most common labels in “{namespace}”.</p>
+                <h2>Namespace details</h2>
+                <p className="muted small">{namespace}</p>
               </div>
             </header>
+      {stats && (
+        <section className="property-list" aria-label="Namespace totals">
+          {[
+            ["Nodes", stats.nodes, "node"],
+            ["Edges", stats.edges, "link"],
+            ["Texts", stats.texts, "file"],
+            ["Vectors", stats.vectors, "graph"],
+            ["Dimension", stats.vector_dimension ?? "—", "target"],
+          ].map(([label, value, icon], index) => (
+            <article key={label} className={index < 2 ? "metric primary-metric" : "metric"}>
+              <Icon name={icon as IconName} size={16} />
+              <div>
+                <span className="metric-label">{label}</span>
+                <strong className="metric-value">{typeof value === "number" ? value.toLocaleString() : value}</strong>
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
             <div className="composition-grid">
               <section>
                 <h3>Node labels</h3>

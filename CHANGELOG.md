@@ -66,9 +66,10 @@ engine's repository (engine phase 15).
 - **Responsive workspace**: compact and narrow layouts center page content,
   scroll dense toolbars safely, expose the script schema as a drawer, adapt
   forms and dialogs, and move graph inspection into a bottom sheet.
-- **Graphene visual system**: the overview uses a clearer metric ribbon and
-  balanced composition panels, while both Canvas and WebGL nodes use the
-  mark's green palette, hexagonal cells, luminous cores and focused halos.
+- **Graphene data workspace**: an icon-led toolbar exposes every Studio
+  module across the top while a contextual namespace tree anchors the side,
+  giving dense graph data the structure of a desktop administration client;
+  Canvas and WebGL nodes retain the mark's green palette and geometry.
 - **Installers**: Windows (`.exe`, `.msi`, for the current user), Linux
   (`.deb`, `.rpm`, `.AppImage`); none carries an engine or installs a
   service. The Studio's web build as a `.zip`, for a web server.

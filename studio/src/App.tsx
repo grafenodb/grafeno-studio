@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { type About,
   type Connection,
@@ -238,7 +238,7 @@ function NamespaceMenu() {
   };
   const known = namespaces.some((info) => info.name === namespace);
   return (
-    <div className="ns-menu" ref={box}>
+    <div className="ns-menu namespace-menu" ref={box}>
       <button className="ns-button" onClick={() => setOpen((value) => !value)} title="Switch or create a namespace">
         <span className="ns-dot" />
         <span className="muted small">namespace</span>
@@ -445,10 +445,15 @@ export function App() {
   const [edgeForm, setEdgeForm] = useState<NewEdgeOptions | null>(null);
   const [palette, setPalette] = useState(false);
   const [collapsed, setCollapsed] = useState(() => readSetting("grafeno.studio.collapsed", "") === "1");
-  const [theme, setTheme] = useState<Theme>(() => readSetting("grafeno.studio.theme", "dark") as Theme);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const value = Number(readSetting("grafeno.studio.sidebar-width", "224"));
+    return Number.isFinite(value) ? Math.min(360, Math.max(184, value)) : 224;
+  });
+  const [expandedNamespaces, setExpandedNamespaces] = useState<Set<string>>(() => new Set());
+  const [theme, setTheme] = useState<Theme>(() => readSetting("grafeno.studio.theme", "light") as Theme);
 
   useEffect(() => {
-    // Dark is the default look; "system" follows the system's choice.
+    // Light is the default look; "system" follows the system's choice.
     document.documentElement.dataset.theme = theme;
     writeSetting("grafeno.studio.theme", theme);
   }, [theme]);
@@ -559,6 +564,32 @@ export function App() {
 
   const client = useMemo(() => (connection ? clientFor(connection) : null), [connection]);
   const current = namespace || "default";
+  const currentInfo = namespaces.find((info) => info.name === current);
+
+  useEffect(() => {
+    setExpandedNamespaces((value) => {
+      if (value.has(current)) return value;
+      const next = new Set(value);
+      next.add(current);
+      return next;
+    });
+  }, [current]);
+
+  const resizeSidebar = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const start = event.clientX;
+    const width = sidebarWidth;
+    const move = (next: PointerEvent) => setSidebarWidth(Math.min(360, Math.max(184, width + next.clientX - start)));
+    const finish = (next: PointerEvent) => {
+      const value = Math.min(360, Math.max(184, width + next.clientX - start));
+      setSidebarWidth(value);
+      writeSetting("grafeno.studio.sidebar-width", String(value));
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", finish);
+  };
 
   useEffect(() => {
     if (!client) return;
@@ -705,21 +736,109 @@ export function App() {
 
   return (
     <StudioContext.Provider value={studio}>
-      <div className={collapsed ? "app collapsed" : "app"} aria-busy={checking}>
-        <nav className="sidebar">
-          <a className="sidebar-brand" href="#/overview">
+      <div
+        className={collapsed ? "app collapsed" : "app"}
+        aria-busy={checking}
+        style={{ "--rail-open": `${sidebarWidth}px` } as CSSProperties}
+      >
+        <header className="topbar">
+          <a className="topbar-brand" href="#/overview">
             <Logo size={30} />
             <span className="brand-text">
               Grafeno <span>Studio</span>
             </span>
           </a>
-          <div className="nav">
+          <nav className="toolbar-nav" aria-label="Studio tools">
             {VIEWS.filter((item) => !item.needs || studio.supports(item.needs)).map((item) => (
-              <a key={item.id} href={`#/${item.id}`} className={item.id === view ? "nav-item active" : "nav-item"} title={collapsed ? item.title : item.hint}>
-                <Icon name={item.icon} size={18} />
+              <a key={item.id} href={`#/${item.id}`} className={item.id === view ? "toolbar-item active" : "toolbar-item"} title={item.hint}>
+                <Icon name={item.icon} size={20} />
                 <span>{item.title}</span>
               </a>
             ))}
+          </nav>
+          <div className="toolbar-context">
+            <button className="mobile-search" aria-label="Search or jump to" onClick={() => setPalette(true)}>
+              <Icon name="search" size={17} />
+            </button>
+            <NewMenu />
+            <span className="server-pill" title={local ? local.path : connection.url}>
+              <span className="live-dot" />
+              {local ? local.name : connection.url.replace(/^https?:\/\//, "")} · v{version}
+            </span>
+            <button
+              className="ghost icon-button"
+              title={local ? "Close the database" : connection?.user ? `Sign out ${connection.user}` : "Disconnect"}
+              onClick={() => {
+                if (local) {
+                  void closeLocal();
+                  return;
+                }
+                // A signed-in user's session ends on the server too.
+                if (connection?.refresh) void clientFor(connection).signOut().catch(() => undefined);
+                forgetConnection();
+                setConnection(null);
+              }}
+            >
+              <Icon name="logout" />
+            </button>
+          </div>
+        </header>
+        <aside className="sidebar">
+          <div className="sidebar-pane-heading">
+            <div>
+              <strong>Namespaces</strong>
+              <span>Graph workspaces</span>
+            </div>
+            <span className="sidebar-count">{namespaces.length}</span>
+          </div>
+          <button className="sidebar-search" onClick={() => setPalette(true)}>
+            <Icon name="search" size={15} />
+            <span>Search or jump to…</span>
+            <kbd>Ctrl K</kbd>
+          </button>
+          <div className="sidebar-tree">
+            {namespaces.map((info) => {
+              const expanded = expandedNamespaces.has(info.name);
+              return (
+                <div className="sidebar-tree-group" key={info.name}>
+                  <button
+                    className={info.name === current ? "sidebar-tree-item active" : "sidebar-tree-item"}
+                    onClick={() => {
+                      setNamespace(info.name);
+                      setExpandedNamespaces((value) => {
+                        const next = new Set(value);
+                        if (expanded) next.delete(info.name);
+                        else next.add(info.name);
+                        return next;
+                      });
+                    }}
+                    title={info.description || info.name}
+                    aria-expanded={expanded}
+                  >
+                    <Icon name={expanded ? "chevronDown" : "chevronRight"} size={13} />
+                    <Icon name="explorer" size={15} />
+                    <span>
+                      <strong>{info.name}</strong>
+                      <small>{info.nodes.toLocaleString()} nodes · {info.edges.toLocaleString()} facts</small>
+                    </span>
+                  </button>
+                  {expanded && (
+                    <div className="sidebar-tree-children" role="group" aria-label={`${info.name} tools`}>
+                      <a href="#/explorer" onClick={() => setNamespace(info.name)} className={info.name === current && view === "explorer" ? "active" : ""}>
+                        <Icon name="node" size={13} /> Nodes <span>{info.nodes.toLocaleString()}</span>
+                      </a>
+                      <a href="#/graph" onClick={() => setNamespace(info.name)} className={info.name === current && view === "graph" ? "active" : ""}>
+                        <Icon name="link" size={13} /> Facts <span>{info.edges.toLocaleString()}</span>
+                      </a>
+                      <a href="#/scripts" onClick={() => setNamespace(info.name)} className={info.name === current && view === "scripts" ? "active" : ""}>
+                        <Icon name="scripts" size={13} /> Query
+                      </a>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {namespaces.length === 0 && <p className="muted small sidebar-empty">No namespaces yet.</p>}
           </div>
           <div className="sidebar-foot">
             <div className="theme-switch" role="group" aria-label="Theme">
@@ -741,37 +860,25 @@ export function App() {
               <span>Collapse</span>
             </button>
           </div>
-        </nav>
-        <header className="topbar">
-          <NamespaceMenu />
-          <button className="search-trigger" onClick={() => setPalette(true)}>
-            <Icon name="search" />
-            <span>Search or jump to…</span>
-            <kbd>Ctrl K</kbd>
-          </button>
-          <div className="spacer" />
-          <NewMenu />
-          <span className="server-pill" title={local ? local.path : connection.url}>
-            <span className="live-dot" />
-            {local ? local.name : connection.url.replace(/^https?:\/\//, "")} · v{version}
-          </span>
-          <button
-            className="ghost icon-button"
-            title={local ? "Close the database" : connection?.user ? `Sign out ${connection.user}` : "Disconnect"}
-            onClick={() => {
-              if (local) {
-                void closeLocal();
-                return;
-              }
-              // A signed-in user's session ends on the server too.
-              if (connection?.refresh) void clientFor(connection).signOut().catch(() => undefined);
-              forgetConnection();
-              setConnection(null);
+          <div
+            className="sidebar-resizer"
+            role="separator"
+            aria-label="Resize namespace explorer"
+            aria-orientation="vertical"
+            aria-valuemin={184}
+            aria-valuemax={360}
+            aria-valuenow={sidebarWidth}
+            tabIndex={collapsed ? -1 : 0}
+            onPointerDown={resizeSidebar}
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home") return;
+              event.preventDefault();
+              const next = event.key === "Home" ? 224 : Math.min(360, Math.max(184, sidebarWidth + (event.key === "ArrowRight" ? 12 : -12)));
+              setSidebarWidth(next);
+              writeSetting("grafeno.studio.sidebar-width", String(next));
             }}
-          >
-            <Icon name="logout" />
-          </button>
-        </header>
+          />
+        </aside>
         <main className={layout} key={`${connection.url}-${current}-${view}`}>
           {view === "overview" && <OverviewView />}
           {view === "explorer" && <ExplorerView selected={route.param} />}
@@ -783,6 +890,17 @@ export function App() {
           {view === "cluster" && <ClusterView />}
           {view === "access" && <AccessView />}
         </main>
+        <footer className="statusbar">
+          <span className="status-connection"><span className="live-dot" /> Connected</span>
+          <span className="status-divider" />
+          <span className="ellipsis" title={local ? local.path : connection.url}>{local ? local.name : connection.url.replace(/^https?:\/\//, "")}</span>
+          <span className="status-divider" />
+          <span className="mono">{current}</span>
+          <span className="spacer" />
+          {currentInfo && <span>{currentInfo.nodes.toLocaleString()} nodes · {currentInfo.edges.toLocaleString()} facts</span>}
+          <span className="status-divider" />
+          <span className="mono">Grafeno {version}</span>
+        </footer>
       </div>
 
       {nodeForm && <NodeForm options={nodeForm} onClose={() => setNodeForm(null)} />}

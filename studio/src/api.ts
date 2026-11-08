@@ -193,7 +193,7 @@ export function displayName(node: Pick<Node, "id" | "labels" | "props">): string
   return `${node.labels[0] ?? "Node"} ${node.id.slice(-8)}`;
 }
 
-const PALETTE = ["#14b8a6", "#6366f1", "#f59e0b", "#ec4899", "#22c55e", "#0ea5e9", "#a855f7", "#ef4444", "#84cc16", "#f97316"];
+const PALETTE = ["#3fd0a8", "#6fd6b5", "#22a888", "#8fe3c5", "#4fbf9f", "#74dcbb", "#1f9c80", "#a7ecd2", "#5aa894", "#86c9b3"];
 
 /** A stable color per label. */
 export function labelColor(label: string): string {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { describeError, formatTime, go, labelColor } from "../api.ts";
-import { Icon } from "../icons.tsx";
+import { Icon, type IconName } from "../icons.tsx";
 import { useStudio } from "../context.ts";
 import type { NamespaceStats } from "../../../client/src/index.ts";
 
@@ -10,21 +10,18 @@ function Bars({ counts }: { counts: Record<string, number> }) {
   const top = entries[0]?.[1] ?? 1;
   if (entries.length === 0) return <div className="muted small">None.</div>;
   return (
-    <table>
-      <tbody>
-        {entries.map(([label, count]) => (
-          <tr key={label}>
-            <td style={{ width: "30%" }}>
-              <span className="dot" style={{ background: labelColor(label) }} /> {label}
-            </td>
-            <td style={{ width: "15%" }} className="mono">{count}</td>
-            <td>
-              <div className="bar" style={{ width: `${(count / top) * 100}%` }} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="overview-bars">
+      {entries.map(([label, count]) => (
+        <div className="overview-bar-row" key={label}>
+          <span className="dot" style={{ background: labelColor(label) }} />
+          <span className="overview-bar-label" title={label}>{label}</span>
+          <span className="mono overview-bar-count">{count.toLocaleString()}</span>
+          <span className="overview-bar-track" aria-hidden="true">
+            <span style={{ width: `${(count / top) * 100}%` }} />
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -38,13 +35,13 @@ export function OverviewView() {
   }, [client, namespace, revision]);
 
   return (
-    <div className="stack">
-      <div className="page-head">
-        <div>
+    <div className="stack overview-page">
+      <div className="page-head overview-head">
+        <div className="overview-heading">
           <h1>Overview</h1>
-          <p className="muted">What “{namespace}” holds, and where to start.</p>
+          <p className="muted">A live view of “{namespace}” and the structure it holds.</p>
         </div>
-        <div className="row">
+        <div className="row overview-actions">
           <button onClick={() => newNode({ onCreated: (id) => go("explorer", id) })}>
             <Icon name="node" /> New node
           </button>
@@ -58,24 +55,33 @@ export function OverviewView() {
       </div>
       {error && <div className="error">{error}</div>}
       {stats && (
-        <div className="cards">
+        <section className="metric-ribbon" aria-label="Namespace totals">
           {[
-            ["Nodes", stats.nodes],
-            ["Edges", stats.edges],
-            ["Texts", stats.texts],
-            ["Vectors", stats.vectors],
-            ["Dimension", stats.vector_dimension ?? "—"],
-          ].map(([label, value]) => (
-            <div key={label} className="panel card">
-              <div className="label small">{label}</div>
-              <div className="value">{value}</div>
-            </div>
+            ["Nodes", stats.nodes, "node"],
+            ["Edges", stats.edges, "link"],
+            ["Texts", stats.texts, "file"],
+            ["Vectors", stats.vectors, "graph"],
+            ["Dimension", stats.vector_dimension ?? "—", "target"],
+          ].map(([label, value, icon], index) => (
+            <article key={label} className={index < 2 ? "metric primary-metric" : "metric"}>
+              <Icon name={icon as IconName} size={16} />
+              <div>
+                <span className="metric-label">{label}</span>
+                <strong className="metric-value">{typeof value === "number" ? value.toLocaleString() : value}</strong>
+              </div>
+            </article>
           ))}
-        </div>
+        </section>
       )}
-      <div className="split">
-        <div className="panel">
-          <h2>Namespaces</h2>
+      <div className="overview-grid">
+        <section className="panel overview-namespaces">
+          <header className="panel-heading">
+            <div>
+              <h2>Namespaces</h2>
+              <p className="muted small">Choose the graph you want to inspect.</p>
+            </div>
+            <span className="panel-count">{namespaces.length}</span>
+          </header>
           {namespaces.length === 0 && (
             <p className="muted small">
               The database is empty. Create a node with <strong>New node</strong>, or run a script in{" "}
@@ -99,8 +105,8 @@ export function OverviewView() {
                     className={info.name === namespace ? "clickable selected" : "clickable"}
                     onClick={() => setNamespace(info.name)}
                   >
-                    <td>
-                      {info.name}
+                    <td className="namespace-name" title={info.name}>
+                      <strong>{info.name}</strong>
                       {info.description && <div className="muted small">{info.description}</div>}
                     </td>
                     <td className="mono">{info.nodes === 0 ? <span className="muted">empty</span> : info.nodes}</td>
@@ -111,18 +117,26 @@ export function OverviewView() {
               </tbody>
             </table>
           </div>
-        </div>
+        </section>
         {stats && (
-          <div className="stack">
-            <div className="panel">
-              <h2>Node labels in “{namespace}”</h2>
-              <Bars counts={stats.node_labels} />
+          <section className="panel overview-composition">
+            <header className="panel-heading">
+              <div>
+                <h2>Graph composition</h2>
+                <p className="muted small">The most common labels in “{namespace}”.</p>
+              </div>
+            </header>
+            <div className="composition-grid">
+              <section>
+                <h3>Node labels</h3>
+                <Bars counts={stats.node_labels} />
+              </section>
+              <section>
+                <h3>Edge labels</h3>
+                <Bars counts={stats.edge_labels} />
+              </section>
             </div>
-            <div className="panel">
-              <h2>Edge labels</h2>
-              <Bars counts={stats.edge_labels} />
-            </div>
-          </div>
+          </section>
         )}
       </div>
     </div>

@@ -99,6 +99,17 @@ const HEX = Array.from({ length: 6 }, (_, i) => {
   return { x: Math.cos(angle), y: Math.sin(angle) };
 });
 
+function hexagon(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number): void {
+  ctx.beginPath();
+  for (let index = 0; index < HEX.length; index++) {
+    const px = x + HEX[index].x * radius;
+    const py = y + HEX[index].y * radius;
+    if (index === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
 const MIN_ZOOM = 0.08;
 const MAX_ZOOM = 6;
 const CLICK = 4;
@@ -892,32 +903,45 @@ export class GraphEngine {
     }
     ctx.setLineDash([]);
 
-    // Nodes: halo, hexagon, rings.
+    // Nodes echo the mark: a quiet halo, dark graphene cell and bright atom.
     for (const node of this.nodes) {
       const nx = node.x ?? 0;
       const ny = node.y ?? 0;
       const r = node.size;
       const dimmed = !!lit && !lit.has(node.id);
       const selected = this.selected.has(node.id);
-      ctx.globalAlpha = dimmed ? 0.06 : node.id === focus || selected ? 0.32 : 0.16;
+      const active = node.id === focus || selected;
+      ctx.globalAlpha = dimmed ? 0.035 : active ? 0.24 : 0.11;
       ctx.fillStyle = node.color;
       ctx.beginPath();
-      ctx.arc(nx, ny, r * 1.9, 0, Math.PI * 2);
+      ctx.arc(nx, ny, r * 2.15, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.globalAlpha = dimmed ? 0.22 : 1;
-      ctx.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const px = nx + HEX[i].x * r;
-        const py = ny + HEX[i].y * r;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
+      ctx.save();
+      ctx.globalAlpha = dimmed ? 0.18 : 0.98;
+      ctx.fillStyle = palette.panel;
+      ctx.shadowColor = node.color;
+      ctx.shadowBlur = active ? 13 / k : 0;
+      hexagon(ctx, nx, ny, r);
       ctx.fill();
-      ctx.lineWidth = 1.6 / k;
-      ctx.strokeStyle = palette.panel;
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = dimmed ? 0.18 : active ? 1 : 0.78;
+      ctx.lineWidth = (active ? 2 : 1.35) / k;
+      ctx.strokeStyle = node.color;
       ctx.stroke();
+      ctx.restore();
+
+      ctx.globalAlpha = dimmed ? 0.16 : 0.96;
+      ctx.fillStyle = node.color;
+      ctx.beginPath();
+      ctx.arc(nx, ny, Math.max(2.4 / k, r * 0.34), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = dimmed ? 0.08 : 0.66;
+      ctx.fillStyle = palette.text;
+      ctx.beginPath();
+      ctx.arc(nx - r * 0.1, ny - r * 0.12, Math.max(0.8 / k, r * 0.09), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = dimmed ? 0.22 : 1;
       if (node.count !== undefined) {
         ctx.lineWidth = 1.4 / k;
         ctx.strokeStyle = node.color;
@@ -932,10 +956,9 @@ export class GraphEngine {
         ctx.stroke();
       }
       if (selected) {
-        ctx.lineWidth = 2.4 / k;
+        ctx.lineWidth = 2.2 / k;
         ctx.strokeStyle = palette.accent;
-        ctx.beginPath();
-        ctx.arc(nx, ny, r + 6, 0, Math.PI * 2);
+        hexagon(ctx, nx, ny, r + 6 / k);
         ctx.stroke();
       }
       if (node.pinned) {
@@ -999,16 +1022,16 @@ export class GraphEngine {
       const nx = node.x ?? 0;
       const ny = node.y ?? 0;
       const selected = this.selected.has(node.id);
-      ctx.globalAlpha = selected || node.id === focus ? 0.28 : 0.9;
+      const active = selected || node.id === focus;
+      ctx.globalAlpha = active ? 0.2 : 0.1;
       ctx.fillStyle = node.color;
       ctx.beginPath();
-      ctx.arc(nx, ny, selected || node.id === focus ? node.size * 1.9 : node.size + 2, 0, Math.PI * 2);
+      ctx.arc(nx, ny, active ? node.size * 2.15 : node.size * 1.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = selected || node.id === focus ? palette.accent : node.color;
-      ctx.lineWidth = (selected ? 2.4 : 1.2) / k;
-      ctx.beginPath();
-      ctx.arc(nx, ny, node.size + (selected ? 6 : 4), 0, Math.PI * 2);
+      ctx.strokeStyle = active ? palette.accent : node.color;
+      ctx.lineWidth = (selected ? 2.2 : 1.2) / k;
+      hexagon(ctx, nx, ny, node.size + (selected ? 6 / k : 3 / k));
       ctx.stroke();
       if (node.pinned) {
         ctx.fillStyle = palette.text;

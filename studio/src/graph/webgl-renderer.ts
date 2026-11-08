@@ -100,7 +100,11 @@ void main() {
   float side = 1.0 - p.x * 0.57735027;
   if (p.x > 0.87 || p.y > side) discard;
   float border = min(0.87 - p.x, side - p.y);
-  outColor = border < 0.08 ? mix(vColor, uPanel, 0.72) : vColor;
+  float core = 1.0 - smoothstep(0.25, 0.34, length(vLocal));
+  vec4 cell = mix(uPanel, vColor, 0.16);
+  vec4 rim = mix(vColor, vec4(1.0), 0.06);
+  vec4 atom = mix(vColor, vec4(1.0), 0.18);
+  outColor = border < 0.075 ? rim : mix(cell, atom, core);
 }`;
 
 const EDGE_VERTEX = `#version 300 es

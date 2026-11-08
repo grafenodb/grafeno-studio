@@ -19,7 +19,7 @@ function randomFrom(seed: number): () => number {
   };
 }
 
-const COLORS = ["#3dd6b3", "#69a7ff", "#b58cff", "#ff9e64", "#ef6f91"];
+const COLORS = ["#3fd0a8", "#6fd6b5", "#22a888", "#8fe3c5", "#4fbf9f"];
 
 function makeNodes(count: number): NodeInput[] {
   return Array.from({ length: count }, (_, index) => ({

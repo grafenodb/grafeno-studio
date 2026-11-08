@@ -3776,6 +3776,7 @@ td .badge {
   --rail: 58px;
   --rail-open: 224px;
   --bar: 74px;
+  --tabs: 35px;
   --status: 24px;
   --gap: 0px;
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 12%);
@@ -3841,12 +3842,12 @@ h2 {
 
 .app {
   grid-template-columns: var(--rail-now) 1fr;
-  grid-template-rows: var(--bar) minmax(0, 1fr) var(--status);
+  grid-template-rows: var(--bar) var(--tabs) minmax(0, 1fr) var(--status);
   background: var(--bg-2);
 }
 
 .sidebar {
-  grid-row: 2;
+  grid-row: 2 / 4;
   grid-column: 1;
   margin: 0;
   gap: 0;
@@ -4210,6 +4211,8 @@ h2 {
 }
 
 .main {
+  grid-column: 2;
+  grid-row: 3;
   padding: 20px 22px 28px;
   background: var(--bg-2);
   animation: none;
@@ -4230,9 +4233,137 @@ h2 {
   background: transparent;
 }
 
+.workspace-tabs {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  padding: 3px 6px 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.workspace-tab {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 156px;
+  max-width: 250px;
+  height: 31px;
+  margin-right: 2px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 5px 5px 0 0;
+  color: var(--muted);
+}
+
+.workspace-tab:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel-solid) 55%, transparent);
+}
+
+.workspace-tab.active {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--panel-solid);
+}
+
+.workspace-tab.active::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: -1px;
+  right: 7px;
+  left: 7px;
+  height: 2px;
+  background: var(--accent);
+}
+
+.workspace-tab-target {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 15px minmax(48px, 1fr) minmax(0, auto);
+  grid-template-rows: 1fr;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 29px;
+  padding: 4px 25px 4px 8px;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.workspace-tab-target:hover {
+  background: transparent;
+}
+
+.workspace-tab-target .icon {
+  color: var(--accent);
+}
+
+.workspace-tab-target span,
+.workspace-tab-target small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-tab-target span {
+  font-size: 11.5px;
+  line-height: 1.1;
+}
+
+.workspace-tab-target small {
+  display: block;
+  max-width: 76px;
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+}
+
+.workspace-tab-target small::before {
+  content: "· ";
+}
+
+.workspace-tab-close {
+  position: absolute;
+  z-index: 2;
+  top: 5px;
+  right: 4px;
+  display: grid;
+  width: 20px;
+  min-height: 20px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 3px;
+  color: var(--faint);
+  background: transparent;
+  opacity: 0;
+}
+
+.workspace-tab:hover .workspace-tab-close,
+.workspace-tab.active .workspace-tab-close,
+.workspace-tab-close:focus-visible {
+  opacity: 1;
+}
+
+.workspace-tab-close:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
 .statusbar {
   grid-column: 1 / -1;
-  grid-row: 3;
+  grid-row: 4;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -4467,7 +4598,7 @@ button.primary {
   .app,
   .app.collapsed {
     grid-template-columns: 1fr;
-    grid-template-rows: 108px minmax(0, 1fr) var(--status);
+    grid-template-rows: 108px var(--tabs) minmax(0, 1fr) var(--status);
     background: var(--bg-2);
   }
 
@@ -4513,12 +4644,17 @@ button.primary {
   .main.full,
   .main.canvas-view {
     grid-column: 1;
+    grid-row: 3;
+  }
+
+  .workspace-tabs {
+    grid-column: 1;
     grid-row: 2;
   }
 
   .statusbar {
     grid-column: 1;
-    grid-row: 3;
+    grid-row: 4;
   }
 
   .statusbar > .ellipsis,

@@ -78,9 +78,13 @@
 
 ### Phase 2 — Workspace documents
 
-- Define a document model for query, graph and node tabs.
-- Preserve state without mounting inactive expensive views.
-- Add close, dirty and restoration behavior backed by local client storage.
+- **Implemented:** define a document model for every routed workspace tool,
+  including namespace and selected node identity.
+- **Implemented:** keep only the active routed view mounted, so inactive graph
+  documents do not retain workers, WebGL contexts or pending requests.
+- **Implemented:** close, cycle and restore documents from connection-scoped
+  local client storage. Scripts continue to auto-save through their existing
+  library, so they do not expose a misleading dirty marker.
 
 ### Phase 3 — Data tools
 

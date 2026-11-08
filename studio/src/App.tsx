@@ -29,6 +29,14 @@ import { OverviewView } from "./views/OverviewView.tsx";
 import { ScriptsView } from "./views/ScriptsView.tsx";
 import { SearchView } from "./views/SearchView.tsx";
 import { StartView } from "./views/StartView.tsx";
+import {
+  addWorkspaceDocument,
+  readWorkspaceDocuments,
+  workspaceDocument,
+  workspaceStorageKey,
+  writeWorkspaceDocuments,
+  type WorkspaceDocument,
+} from "./workspace-documents.ts";
 
 export { useStudio };
 
@@ -437,6 +445,12 @@ export function App() {
   const [route, setRoute] = useState(parseHash);
   const [namespaces, setNamespaces] = useState<NamespaceInfo[]>([]);
   const [namespace, setNamespaceState] = useState(() => readSetting("grafeno.studio.namespace", ""));
+  const [documents, setDocuments] = useState<WorkspaceDocument[]>(() => {
+    const initial = parseHash();
+    return [workspaceDocument(initial.view, readSetting("grafeno.studio.namespace", "") || "default", initial.param)];
+  });
+  const [activeDocument, setActiveDocument] = useState(() => documents[0].id);
+  const [loadedWorkspace, setLoadedWorkspace] = useState("");
   const [schema, setSchema] = useState<Studio["schema"]>({ labels: {}, edgeLabels: {} });
   const [revision, setRevision] = useState(0);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -565,6 +579,41 @@ export function App() {
   const client = useMemo(() => (connection ? clientFor(connection) : null), [connection]);
   const current = namespace || "default";
   const currentInfo = namespaces.find((info) => info.name === current);
+  const workspaceKey = connection
+    ? workspaceStorageKey(local?.path ?? `${connection.url}|${connection.user ?? "anonymous"}`)
+    : "";
+
+  useEffect(() => {
+    if (!workspaceKey || loadedWorkspace === workspaceKey) return;
+    const saved = readWorkspaceDocuments(workspaceKey);
+    const explicitRoute = route.view !== "overview" || Boolean(route.param);
+    if (saved && !explicitRoute) {
+      const active = saved.documents.find((item) => item.id === saved.active) ?? saved.documents[0];
+      setDocuments(saved.documents);
+      setActiveDocument(active.id);
+      setNamespaceState(active.namespace);
+      writeSetting("grafeno.studio.namespace", active.namespace);
+      setRoute({ view: active.view, param: active.param });
+      go(active.view, active.param);
+    } else {
+      const document = workspaceDocument(route.view, current, route.param);
+      setDocuments((list) => addWorkspaceDocument(saved?.documents ?? list, document));
+      setActiveDocument(document.id);
+    }
+    setLoadedWorkspace(workspaceKey);
+  }, [workspaceKey, loadedWorkspace, route, current]);
+
+  useEffect(() => {
+    if (!workspaceKey || loadedWorkspace !== workspaceKey) return;
+    const document = workspaceDocument(route.view, current, route.param);
+    setDocuments((list) => addWorkspaceDocument(list, document));
+    setActiveDocument(document.id);
+  }, [route, current, workspaceKey, loadedWorkspace]);
+
+  useEffect(() => {
+    if (!workspaceKey || loadedWorkspace !== workspaceKey) return;
+    writeWorkspaceDocuments(workspaceKey, { documents, active: activeDocument });
+  }, [documents, activeDocument, workspaceKey, loadedWorkspace]);
 
   useEffect(() => {
     setExpandedNamespaces((value) => {
@@ -627,6 +676,41 @@ export function App() {
     setNamespaceState(name);
     writeSetting("grafeno.studio.namespace", name);
   }, []);
+
+  const activateDocument = useCallback((document: WorkspaceDocument) => {
+    setActiveDocument(document.id);
+    setNamespace(document.namespace);
+    setRoute({ view: document.view, param: document.param });
+    go(document.view, document.param);
+  }, [setNamespace]);
+
+  const closeDocument = useCallback((id: string) => {
+    const index = documents.findIndex((item) => item.id === id);
+    if (index < 0) return;
+    let remaining = documents.filter((item) => item.id !== id);
+    if (remaining.length === 0) remaining = [workspaceDocument("overview", current)];
+    setDocuments(remaining);
+    if (id === activeDocument) activateDocument(remaining[Math.min(index, remaining.length - 1)]);
+  }, [documents, activeDocument, current, activateDocument]);
+
+  useEffect(() => {
+    const onDocumentKey = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      if (event.key === "w") {
+        event.preventDefault();
+        closeDocument(activeDocument);
+        return;
+      }
+      if (event.key !== "PageUp" && event.key !== "PageDown") return;
+      event.preventDefault();
+      const index = documents.findIndex((item) => item.id === activeDocument);
+      if (index < 0 || documents.length < 2) return;
+      const direction = event.key === "PageDown" ? 1 : -1;
+      activateDocument(documents[(index + direction + documents.length) % documents.length]);
+    };
+    window.addEventListener("keydown", onDocumentKey);
+    return () => window.removeEventListener("keydown", onDocumentKey);
+  }, [documents, activeDocument, activateDocument, closeDocument]);
 
   const changed = useCallback(() => setRevision((value) => value + 1), []);
 
@@ -879,6 +963,34 @@ export function App() {
             }}
           />
         </aside>
+        <div className="workspace-tabs" role="tablist" aria-label="Open workspace documents">
+          {documents.map((document) => {
+            const definition = VIEWS.find((item) => item.id === document.view) ?? VIEWS[0];
+            const selected = document.id === activeDocument;
+            const title = document.param && document.view === "explorer"
+              ? `Node ${document.param.slice(0, 8)}`
+              : definition.title;
+            return (
+              <div key={document.id} className={selected ? "workspace-tab active" : "workspace-tab"}>
+                <button
+                  className="workspace-tab-target"
+                  role="tab"
+                  aria-selected={selected}
+                  title={`${title} — ${document.namespace}`}
+                  onClick={() => activateDocument(document)}
+                  onAuxClick={(event) => event.button === 1 && closeDocument(document.id)}
+                >
+                  <Icon name={definition.icon} size={14} />
+                  <span>{title}</span>
+                  <small>{document.namespace}</small>
+                </button>
+                <button className="workspace-tab-close" aria-label={`Close ${title}`} title="Close (Ctrl+W)" onClick={() => closeDocument(document.id)}>
+                  <Icon name="x" size={12} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
         <main className={layout} key={`${connection.url}-${current}-${view}`}>
           {view === "overview" && <OverviewView />}
           {view === "explorer" && <ExplorerView selected={route.param} />}

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 
-import { type QueryResult, describeError, go, labelColor } from "../api.ts";
-import { ACTIVE_SCRIPT, clientStorage, migrateLegacyScripts, requestPersistentBrowserStorage, resolveOwner, type StoredScript } from "../client-storage.ts";
+import { type AlgorithmInfo, type QueryResult, describeError, go, labelColor } from "../api.ts";
+import { ACTIVE_SCRIPT, clientStorage, migrateLegacyScripts, orderStoredScripts, requestPersistentBrowserStorage, resolveOwner, type StoredScript } from "../client-storage.ts";
 import { Chart, canChart } from "../components/Chart.tsx";
 import { type CodeEditorHandle, CodeEditor } from "../components/CodeEditor.tsx";
 import { JsonTree } from "../components/JsonTree.tsx";
@@ -27,9 +27,17 @@ interface Run {
   ms: number;
 }
 
-const LAYOUT_KEY = "grafeno.studio.scripts.split";
+interface ScriptOutput {
+  runs: Run[];
+  tab: "messages" | number;
+  mode: "table" | "json" | "graph" | "chart" | "profile";
+}
 
-const WELCOME = `// Grafeno script: GQ statements, each ending with ;
+const EMPTY_OUTPUT: ScriptOutput = { runs: [], tab: "messages", mode: "table" };
+
+const LAYOUT_KEY = "grafeno.studio.scripts.split";
+const SCRIPT_ORDER = "scripts.order";
+const LEGACY_WELCOME = `// Grafeno script: GQ statements, each ending with ;
 // Ctrl+Enter runs the statement under the cursor (or the selection),
 // F5 or Ctrl+Shift+Enter runs the whole script. Each statement is its own transaction.
 
@@ -82,6 +90,14 @@ function createScript(owner: string, name: string, text: string, namespace: stri
   return { owner, id: newId(), name, text, namespace, createdAt: now, updatedAt: now, lastOpenedAt: now };
 }
 
+function nextScriptName(scripts: Script[]): string {
+  const highest = scripts.reduce((value, script) => {
+    const match = /^Script (\d+)$/.exec(script.name);
+    return match ? Math.max(value, Number(match[1])) : value;
+  }, 0);
+  return `Script ${highest + 1}`;
+}
+
 function changes(stats: QueryResult["stats"]): string {
   return Object.entries(stats)
     .filter(([, count]) => count > 0)
@@ -110,25 +126,39 @@ function download(name: string, text: string, type: string): void {
 export function ScriptsView() {
   const { client, connection, namespace, schema, changed, confirm, toast } = useStudio();
   const [library, setLibrary] = useState<Library>(() => {
-    const welcome = createScript("", "Welcome", WELCOME, null);
-    return { scripts: [welcome], active: welcome.id };
+    const script = createScript("", "Script 1", "", null);
+    return { scripts: [script], active: script.id };
   });
   const [owner, setOwner] = useState<string | null>(null);
   const [libraryReady, setLibraryReady] = useState(false);
   const [saveState, setSaveState] = useState<"loading" | "saving" | "saved" | "error">("loading");
-  const [runs, setRuns] = useState<Run[]>([]);
+  const [outputs, setOutputs] = useState<Record<string, ScriptOutput>>({});
   const [running, setRunning] = useState(false);
   const [stopOnError, setStopOnError] = useState(true);
-  const [tab, setTab] = useState<"messages" | number>("messages");
-  const [mode, setMode] = useState<"table" | "json" | "graph" | "chart" | "profile">("table");
+  const [algorithms, setAlgorithms] = useState<AlgorithmInfo[]>([]);
+  const [properties, setProperties] = useState<string[]>([]);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [split, setSplit] = useState(() => Number(localStorage.getItem(LAYOUT_KEY)) || 52);
   const [showSchema, setShowSchema] = useState(true);
   const editor = useRef<CodeEditorHandle>(null);
   const stop = useRef(false);
   const workspace = useRef<HTMLDivElement>(null);
+  const scriptTabs = useRef<HTMLDivElement>(null);
 
   const active = library.scripts.find((script) => script.id === library.active) ?? library.scripts[0];
+  const output = outputs[active.id] ?? EMPTY_OUTPUT;
+  const { runs, tab, mode } = output;
+  const patchOutput = useCallback((id: string, patch: Partial<ScriptOutput>) => {
+    setOutputs((current) => ({ ...current, [id]: { ...(current[id] ?? EMPTY_OUTPUT), ...patch } }));
+  }, []);
+  const setTab = (next: ScriptOutput["tab"]) => patchOutput(active.id, { tab: next });
+  const setMode = (next: ScriptOutput["mode"]) => patchOutput(active.id, { mode: next });
+
+  useEffect(() => {
+    window.requestAnimationFrame(() => {
+      scriptTabs.current?.querySelector<HTMLElement>(`[data-script-id="${active.id}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+  }, [active.id]);
 
   useEffect(() => {
     let alive = true;
@@ -137,14 +167,25 @@ export function ScriptsView() {
     void resolveOwner(client, connection)
       .then(async (resolved) => {
         await migrateLegacyScripts(resolved);
+        if (!alive) return;
         let scripts = await clientStorage.scripts(resolved);
+        if (!alive) return;
+        scripts = scripts.map((script) =>
+          script.name === "Welcome" && script.text === LEGACY_WELCOME
+            ? { ...script, name: "Script 1", text: "", updatedAt: Date.now() }
+            : script,
+        );
         let activeId = await clientStorage.setting(resolved, ACTIVE_SCRIPT);
+        scripts = orderStoredScripts(scripts, await clientStorage.setting(resolved, SCRIPT_ORDER));
+        if (!alive) return;
         if (scripts.length === 0) {
-          const welcome = createScript(resolved, "Welcome", WELCOME, null);
-          scripts = [welcome];
-          activeId = welcome.id;
-          await clientStorage.putScript(welcome);
-          await clientStorage.putSetting(resolved, ACTIVE_SCRIPT, welcome.id);
+          // A stable first id also makes React development remounts idempotent:
+          // two overlapping initial loads cannot leave two blank Script 1 records.
+          const script = { ...createScript(resolved, "Script 1", "", null), id: "script-1" };
+          scripts = [script];
+          activeId = script.id;
+          await clientStorage.putScript(script);
+          await clientStorage.putSetting(resolved, ACTIVE_SCRIPT, script.id);
         }
         if (!scripts.some((script) => script.id === activeId)) activeId = scripts[0].id;
         if (!alive) return;
@@ -178,6 +219,7 @@ export function ScriptsView() {
       void Promise.all([
         ...library.scripts.map((script) => clientStorage.putScript(script)),
         clientStorage.putSetting(owner, ACTIVE_SCRIPT, library.active),
+        clientStorage.putSetting(owner, SCRIPT_ORDER, JSON.stringify(library.scripts.map((script) => script.id))),
       ])
         .then(() => setSaveState("saved"))
         .catch(() => setSaveState("error"));
@@ -195,7 +237,6 @@ export function ScriptsView() {
     if (!owner) return;
     const script = createScript(owner, name, text, namespace);
     setLibrary((current) => ({ scripts: [...current.scripts, script], active: script.id }));
-    setRuns([]);
   };
 
   const closeScript = async (script: Script) => {
@@ -208,6 +249,11 @@ export function ScriptsView() {
       const active = current.active === script.id ? scripts[Math.max(0, current.scripts.indexOf(script) - 1)]?.id ?? scripts[0].id : current.active;
       return { scripts, active };
     });
+    setOutputs((current) => {
+      const next = { ...current };
+      delete next[script.id];
+      return next;
+    });
     if (owner) {
       try {
         await clientStorage.deleteScript(owner, script.id);
@@ -217,11 +263,44 @@ export function ScriptsView() {
     }
   };
 
-  const labels = useMemo(() => ({ labels: Object.keys(schema.labels), edgeLabels: Object.keys(schema.edgeLabels) }), [schema]);
+  useEffect(() => {
+    let alive = true;
+    void client.algorithms().then((items) => alive && setAlgorithms(items)).catch(() => alive && setAlgorithms([]));
+    return () => { alive = false; };
+  }, [client]);
+
+  useEffect(() => {
+    let alive = true;
+    const graph = client.namespace(namespace);
+    void Promise.allSettled([
+      graph.query("MATCH (n) RETURN keys(n) AS properties LIMIT 200"),
+      graph.query("MATCH ()-[r]->() RETURN keys(r) AS properties LIMIT 200"),
+    ]).then((results) => {
+      if (!alive) return;
+      const found = new Set<string>();
+      for (const result of results) {
+        if (result.status !== "fulfilled") continue;
+        for (const row of result.value.rows) {
+          for (const value of row) {
+            if (Array.isArray(value)) value.forEach((key) => typeof key === "string" && found.add(key));
+          }
+        }
+      }
+      setProperties([...found].sort((left, right) => left.localeCompare(right)));
+    });
+    return () => { alive = false; };
+  }, [client, namespace]);
+
+  const labels = useMemo(
+    () => ({ labels: Object.keys(schema.labels), edgeLabels: Object.keys(schema.edgeLabels), properties, algorithms }),
+    [schema, properties, algorithms],
+  );
 
   const execute = useCallback(
     async (all: boolean) => {
       if (running) return;
+      const scriptId = active.id;
+      const selectedTab = tab;
       const script = active.text;
       const selection = editor.current?.selection();
       let statements: Statement[];
@@ -245,8 +324,7 @@ export function ScriptsView() {
       const graph = client.namespace(namespace);
       const done: Run[] = [];
       let wrote = false;
-      setRuns([]);
-      setTab("messages");
+      patchOutput(scriptId, { runs: [] });
       for (const statement of statements) {
         if (stop.current) break;
         editor.current?.mark({ running: [statement.from, statement.to] });
@@ -267,21 +345,21 @@ export function ScriptsView() {
             };
           }
           done.push({ statement, status: "error", error, at, ms: performance.now() - started });
-          setRuns([...done]);
+          patchOutput(scriptId, { runs: [...done] });
           if (stopOnError) break;
         }
-        setRuns([...done]);
+        patchOutput(scriptId, { runs: [...done] });
       }
       const failed = done.find((run) => run.status === "error");
       editor.current?.mark(failed ? { error: failed.at?.line ?? failed.statement.line } : null);
       if (failed?.at) editor.current?.goto(failed.at.line, failed.at.column);
       // Show the last result that has rows, unless something failed.
       const lastTable = [...done.keys()].reverse().find((index) => (done[index].result?.columns.length ?? 0) > 0);
-      setTab(failed || lastTable === undefined ? "messages" : lastTable);
+      if (selectedTab !== "messages") patchOutput(scriptId, { tab: failed || lastTable === undefined ? "messages" : lastTable });
       if (wrote) changed();
       setRunning(false);
     },
-    [running, active.text, client, namespace, stopOnError, changed, toast],
+    [running, active.id, active.text, tab, client, namespace, stopOnError, changed, toast, patchOutput],
   );
 
   useEffect(() => {
@@ -295,7 +373,7 @@ export function ScriptsView() {
     const run = () => void execute(false);
     const runAll = () => void execute(true);
     const stopRun = () => { stop.current = true; };
-    const create = () => addScript(`Script ${library.scripts.length + 1}`, "");
+    const create = () => addScript(nextScriptName(library.scripts), "");
     const resetLayout = () => {
       setSplit(52);
       setShowSchema(true);
@@ -353,7 +431,6 @@ export function ScriptsView() {
     try {
       const imported = importScriptLibrary(await file.text(), owner, library.scripts.map((script) => script.id), newId);
       setLibrary((current) => ({ scripts: [...current.scripts, ...imported.scripts], active: imported.active }));
-      setRuns([]);
       toast(`Imported ${imported.scripts.length} script${imported.scripts.length === 1 ? "" : "s"}.`, "ok");
     } catch (problem) {
       toast(describeError(problem), "error");
@@ -434,21 +511,26 @@ export function ScriptsView() {
       )}
 
       <div className="workspace" ref={workspace}>
-        <div className="script-tabs">
+        <div
+          className="script-tabs"
+          ref={scriptTabs}
+          onWheel={(event) => {
+            if (Math.abs(event.deltaY) <= Math.abs(event.deltaX) || event.currentTarget.scrollWidth <= event.currentTarget.clientWidth) return;
+            event.currentTarget.scrollLeft += event.deltaY;
+            event.preventDefault();
+          }}
+        >
           <button className="ghost icon-button" onClick={() => setShowSchema((value) => !value)} title={showSchema ? "Hide schema" : "Show schema"}>
             <Icon name={showSchema ? "chevronLeft" : "chevronRight"} />
           </button>
           {library.scripts.map((script) => (
             <div
               key={script.id}
+              data-script-id={script.id}
               className={script.id === active.id ? "script-tab active" : "script-tab"}
               onClick={() => {
                 if (script.id !== active.id) {
-                  setLibrary((current) => ({
-                    active: script.id,
-                    scripts: current.scripts.map((item) => (item.id === script.id ? { ...item, lastOpenedAt: Date.now() } : item)),
-                  }));
-                  setRuns([]);
+                  setLibrary((current) => ({ ...current, active: script.id }));
                 }
               }}
               onDoubleClick={() => setRenaming(script.id)}
@@ -483,7 +565,7 @@ export function ScriptsView() {
               </button>
             </div>
           ))}
-          <button className="ghost icon-button" onClick={() => addScript(`Script ${library.scripts.length + 1}`, "")} title="New script">
+          <button className="ghost icon-button" onClick={() => addScript(nextScriptName(library.scripts), "")} title="New script">
             <Icon name="plus" />
           </button>
         </div>

@@ -30,8 +30,31 @@ export const PSEUDO_PROPERTIES = [
   "@expired_at",
 ];
 
+const PROCEDURES = [
+  { label: "db.labels", detail: "List node labels and counts" },
+  { label: "db.search", detail: "Full-text search" },
+  { label: "temporal.series", detail: "Generate a temporal series" },
+];
+
+export interface GqCompletionSchema {
+  labels: string[];
+  edgeLabels: string[];
+  properties?: string[];
+  algorithms?: { name: string; arguments: string; description: string }[];
+}
+
 const KEYWORD_SET = new Set(KEYWORDS);
 const FUNCTION_SET = new Set(FUNCTIONS.map((name) => name.toLowerCase()));
+
+function algorithmCompletion(algorithm: NonNullable<GqCompletionSchema["algorithms"]>[number]) {
+  const label = algorithm.name.startsWith("algo.") ? algorithm.name : `algo.${algorithm.name}`;
+  return {
+    label,
+    type: "function" as const,
+    detail: algorithm.description || algorithm.arguments,
+    apply: `${label}(`,
+  };
+}
 
 interface State {
   /** The quote of a string that continues on the next line. */
@@ -90,8 +113,8 @@ export const gqLanguage = StreamLanguage.define<State>({
   languageData: { commentTokens: { line: "//" } },
 });
 
-/** Completion for keywords, functions, pseudo-properties and the namespace's labels. */
-export function gqCompletion(schema: () => { labels: string[]; edgeLabels: string[] }) {
+/** Completion for GQ syntax plus the connected namespace and engine capabilities. */
+export function gqCompletion(schema: () => GqCompletionSchema) {
   return (context: CompletionContext): CompletionResult | null => {
     const label = context.matchBefore(/:[A-Za-z_]\w*|:/);
     if (label) {
@@ -113,6 +136,33 @@ export function gqCompletion(schema: () => { labels: string[]; edgeLabels: strin
         validFor: /^@\w*$/,
       };
     }
+    const qualified = context.matchBefore(/[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\.\w*$/);
+    if (qualified) {
+      const current = qualified.text.toLowerCase();
+      const available = schema();
+      const callable = [
+        ...FUNCTIONS.filter((name) => name.includes(".")).map((label) => ({ label, type: "function", apply: `${label}(` })),
+        ...PROCEDURES.map((procedure) => ({ ...procedure, type: "function", apply: `${procedure.label}(` })),
+        ...(available.algorithms ?? []).map(algorithmCompletion),
+      ];
+      const namespace = current.split(".")[0];
+      if (["algo", "db", "temporal", "date", "duration"].includes(namespace)) {
+        return { from: qualified.from, options: callable, validFor: /^[\w.]*$/ };
+      }
+      const dot = qualified.text.lastIndexOf(".");
+      const inferred = new Set(available.properties ?? []);
+      const document = context.state.doc.toString();
+      for (const match of document.matchAll(/[{,]\s*([A-Za-z_]\w*)\s*:/g)) inferred.add(match[1]);
+      for (const match of document.matchAll(/\b[A-Za-z_]\w*\.([A-Za-z_]\w*)/g)) inferred.add(match[1]);
+      return {
+        from: qualified.from + dot + 1,
+        options: [
+          ...[...inferred].sort().map((name) => ({ label: name, type: "property", detail: "node or fact property" })),
+          ...PSEUDO_PROPERTIES.map((name) => ({ label: name, type: "property", detail: "Grafeno metadata" })),
+        ],
+        validFor: /^@?\w*$/,
+      };
+    }
     const word = context.matchBefore(/\w+/);
     if (!word || (word.from === word.to && !context.explicit)) return null;
     return {
@@ -120,6 +170,8 @@ export function gqCompletion(schema: () => { labels: string[]; edgeLabels: strin
       options: [
         ...KEYWORDS.map((name) => ({ label: name, type: "keyword" })),
         ...FUNCTIONS.map((name) => ({ label: name, type: "function", apply: `${name}(` })),
+        ...PROCEDURES.map((procedure) => ({ ...procedure, type: "function", apply: `${procedure.label}(` })),
+        ...(schema().algorithms ?? []).map(algorithmCompletion),
       ],
       validFor: /^\w*$/,
     };

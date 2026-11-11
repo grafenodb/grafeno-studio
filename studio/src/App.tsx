@@ -21,7 +21,7 @@ import { EdgeForm, NodeForm } from "./components/Forms.tsx";
 import { type ConfirmOptions, type NewEdgeOptions, type NewNodeOptions, type Studio, StudioContext, useStudio } from "./context.ts";
 import { Icon, type IconName, Logo } from "./icons.tsx";
 import { Modal, useNodeSearch } from "./ui.tsx";
-import { type DesktopSession, desktop, isDesktop, saveText } from "./desktop.ts";
+import { type DesktopSession, desktop, isDesktop } from "./desktop.ts";
 import { AdminView } from "./views/AdminView.tsx";
 import { AccessView } from "./views/AccessView.tsx";
 import { ClusterView } from "./views/ClusterView.tsx";
@@ -468,6 +468,7 @@ export function App() {
   const [nodeForm, setNodeForm] = useState<NewNodeOptions | null>(null);
   const [edgeForm, setEdgeForm] = useState<NewEdgeOptions | null>(null);
   const [palette, setPalette] = useState(false);
+  const [scriptsOpened, setScriptsOpened] = useState(() => parseHash().view === "scripts");
   const [collapsed, setCollapsed] = useState(() => readSetting("grafeno.studio.collapsed", "") === "1");
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const value = Number(readSetting("grafeno.studio.sidebar-width", "224"));
@@ -481,6 +482,10 @@ export function App() {
     document.documentElement.dataset.theme = theme;
     writeSetting("grafeno.studio.theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (route.view === "scripts") setScriptsOpened(true);
+  }, [route.view]);
 
   // The database file open in the desktop app, when the Studio runs there.
   const [local, setLocal] = useState<DesktopSession | null>(null);
@@ -736,50 +741,10 @@ export function App() {
 
   const changed = useCallback(() => setRevision((value) => value + 1), []);
 
-  // The desktop app's menu: its items arrive as events.
-  const menuActions = useRef<(id: string) => void>(() => undefined);
-  menuActions.current = (id: string) => {
-    const day = new Date().toISOString().slice(0, 10);
-    const pick = async (create: boolean) => {
-      const path = await desktop.pickDatabase(create);
-      if (path) await openLocal(path);
-    };
-    if (id === "new" || id === "open") void pick(id === "new");
-    else if (id === "close" || id === "connect") {
-      if (local) void closeLocal();
-      else {
-        forgetConnection();
-        setConnection(null);
-      }
-    } else if (id === "palette") setPalette(true);
-    else if (id.startsWith("theme:")) setTheme(id.slice("theme:".length) as Theme);
-    else if (id.startsWith("view:")) go(id.slice("view:".length));
-    else if (id === "export" && client) {
-      void client
-        .export()
-        .then((text) => saveText(`grafeno-all-${day}.jsonl`, text, "application/x-ndjson"))
-        .then((saved) => saved && toast("Exported every namespace.", "ok"))
-        .catch((problem) => toast(describeError(problem), "error"));
-    } else if (id === "import" && client) {
-      void desktop
-        .pickOpen(["jsonl", "ndjson", "json"])
-        .then(async (path) => {
-          if (!path) return;
-          const stats = await client.import(await desktop.readText(path));
-          toast(`Imported ${stats.nodes} nodes and ${stats.edges} facts in ${stats.namespaces} namespaces.`, "ok");
-          changed();
-        })
-        .catch((problem) => toast(describeError(problem), "error"));
-    }
-  };
   useEffect(() => {
     if (!isDesktop) return;
-    const stopMenu = desktop.listen<string>("menu", (id) => menuActions.current(id));
     const stopOpen = desktop.listen<string>("open-path", (path) => void openLocal(path));
-    return () => {
-      stopMenu();
-      stopOpen();
-    };
+    return stopOpen;
   }, [openLocal]);
   const createNamespace = useCallback(
     async (name: string, description?: string) => {
@@ -1005,7 +970,11 @@ export function App() {
           {view === "overview" && <OverviewView />}
           {view === "explorer" && <ExplorerView selected={route.param} />}
           {view === "graph" && <GraphView seed={route.param} />}
-          {view === "scripts" && <ScriptsView />}
+          {(view === "scripts" || scriptsOpened) && (
+            <div className="persistent-scripts" hidden={view !== "scripts"}>
+              <ScriptsView />
+            </div>
+          )}
           {view === "search" && <SearchView />}
           {view === "memory" && <MemoryView />}
           {view === "admin" && <AdminView />}

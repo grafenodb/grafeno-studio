@@ -85,7 +85,27 @@ async function browserScripts(owner: string): Promise<StoredScript[]> {
   const done = complete(transaction);
   const records = await request(transaction.objectStore("scripts").index("owner").getAll(owner) as IDBRequest<StoredScript[]>);
   await done;
-  return records.sort((left, right) => right.lastOpenedAt - left.lastOpenedAt || left.createdAt - right.createdAt);
+  return records.sort((left, right) => left.createdAt - right.createdAt);
+}
+
+/** Restores the explicit tab order and appends records unknown to that order. */
+export function orderStoredScripts(scripts: StoredScript[], raw: string | null): StoredScript[] {
+  let ids: string[] = [];
+  try {
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(parsed)) ids = parsed.filter((id): id is string => typeof id === "string");
+  } catch {
+    // A damaged convenience setting falls back to creation order.
+  }
+  const positions = new Map(ids.map((id, index) => [id, index]));
+  return [...scripts].sort((left, right) => {
+    const leftPosition = positions.get(left.id);
+    const rightPosition = positions.get(right.id);
+    if (leftPosition !== undefined && rightPosition !== undefined) return leftPosition - rightPosition;
+    if (leftPosition !== undefined) return -1;
+    if (rightPosition !== undefined) return 1;
+    return left.createdAt - right.createdAt;
+  });
 }
 
 async function browserPutScript(script: StoredScript): Promise<void> {

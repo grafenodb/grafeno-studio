@@ -87,7 +87,7 @@ pub fn local_scripts(
     store.with(|connection| {
         let mut statement = connection.prepare(
             "SELECT owner, id, name, text, namespace, created_at, updated_at, last_opened_at
-             FROM scripts WHERE owner = ?1 ORDER BY last_opened_at DESC, created_at ASC",
+             FROM scripts WHERE owner = ?1 ORDER BY created_at ASC",
         )?;
         statement
             .query_map([owner], |row| {

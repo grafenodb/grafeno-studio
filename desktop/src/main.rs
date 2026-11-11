@@ -17,7 +17,6 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use serde::Serialize;
-use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewWindow, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
@@ -29,7 +28,7 @@ use bridge::Reply;
 use engine::{EngineInfo, LOCAL_URL, LocalEngine, file_name};
 use local_store::LocalStore;
 
-/// Recent databases kept in the menu and on the start screen.
+/// Recent databases kept on the start screen.
 const RECENT: usize = 10;
 
 struct Desktop {
@@ -393,161 +392,6 @@ async fn request(
         .map_err(|error| error.to_string())?
 }
 
-// ------------------------------------------------------------ menu
-
-/// Menu items whose action happens in the Studio: the focused window gets
-/// their id as a `menu` event.
-const VIEWS: [(&str, &str, &str); 7] = [
-    ("view:overview", "Overview", "CmdOrCtrl+1"),
-    ("view:explorer", "Explorer", "CmdOrCtrl+2"),
-    ("view:graph", "Graph", "CmdOrCtrl+3"),
-    ("view:scripts", "Scripts", "CmdOrCtrl+4"),
-    ("view:search", "Search", "CmdOrCtrl+5"),
-    ("view:memory", "Memory", "CmdOrCtrl+6"),
-    ("view:admin", "Administration", "CmdOrCtrl+7"),
-];
-
-fn rebuild_menu(app: &AppHandle) -> tauri::Result<()> {
-    let desktop = app.state::<Desktop>();
-    let recent = desktop.recent.lock().expect("not poisoned").clone();
-    let mut open_recent = SubmenuBuilder::new(app, "Open recent");
-    if recent.is_empty() {
-        open_recent = open_recent.item(
-            &MenuItemBuilder::with_id("none", "No recent databases")
-                .enabled(false)
-                .build(app)?,
-        );
-    }
-    for (index, path) in recent.iter().enumerate() {
-        open_recent = open_recent.item(
-            &MenuItemBuilder::with_id(format!("recent:{index}"), path.display().to_string())
-                .build(app)?,
-        );
-    }
-    let file = SubmenuBuilder::new(app, "File")
-        .item(
-            &MenuItemBuilder::with_id("window", "New window")
-                .accelerator("CmdOrCtrl+Shift+N")
-                .build(app)?,
-        )
-        .separator()
-        .item(
-            &MenuItemBuilder::with_id("new", "New database…")
-                .accelerator("CmdOrCtrl+N")
-                .build(app)?,
-        )
-        .item(
-            &MenuItemBuilder::with_id("open", "Open database…")
-                .accelerator("CmdOrCtrl+O")
-                .build(app)?,
-        )
-        .item(&open_recent.build()?)
-        .item(&MenuItemBuilder::with_id("connect", "Connect to a server…").build(app)?)
-        .separator()
-        .item(&MenuItemBuilder::with_id("import", "Import…").build(app)?)
-        .item(
-            &MenuItemBuilder::with_id("export", "Export everything…")
-                .accelerator("CmdOrCtrl+E")
-                .build(app)?,
-        )
-        .separator()
-        .item(
-            &MenuItemBuilder::with_id("close", "Close database")
-                .accelerator("CmdOrCtrl+W")
-                .build(app)?,
-        )
-        .item(&PredefinedMenuItem::quit(app, Some("Quit"))?)
-        .build()?;
-    let edit = SubmenuBuilder::new(app, "Edit")
-        .undo()
-        .redo()
-        .separator()
-        .cut()
-        .copy()
-        .paste()
-        .select_all()
-        .build()?;
-    let mut view = SubmenuBuilder::new(app, "View");
-    for (id, label, accelerator) in VIEWS {
-        view = view.item(
-            &MenuItemBuilder::with_id(id, label)
-                .accelerator(accelerator)
-                .build(app)?,
-        );
-    }
-    let view = view
-        .separator()
-        // Ctrl+K is the Studio's own shortcut: no accelerator, or it fires twice.
-        .item(&MenuItemBuilder::with_id("palette", "Command palette (Ctrl+K)").build(app)?)
-        .item(&MenuItemBuilder::with_id("theme:dark", "Dark theme").build(app)?)
-        .item(&MenuItemBuilder::with_id("theme:light", "Light theme").build(app)?)
-        .item(&MenuItemBuilder::with_id("theme:system", "System theme").build(app)?)
-        .separator()
-        .item(
-            &MenuItemBuilder::with_id("reload", "Reload")
-                .accelerator("CmdOrCtrl+R")
-                .build(app)?,
-        )
-        .item(&PredefinedMenuItem::fullscreen(app, None)?)
-        .build()?;
-    let help = SubmenuBuilder::new(app, "Help")
-        .item(&MenuItemBuilder::with_id("help:install", "Install the Grafeno engine").build(app)?)
-        .item(&MenuItemBuilder::with_id("help:docs", "Query language (GQ)").build(app)?)
-        .item(&MenuItemBuilder::with_id("help:repo", "Grafeno on GitHub").build(app)?)
-        .build()?;
-    let menu = MenuBuilder::new(app)
-        .items(&[&file, &edit, &view, &help])
-        .build()?;
-    app.set_menu(menu)?;
-    Ok(())
-}
-
-fn on_menu(app: &AppHandle, id: &str) {
-    let desktop = app.state::<Desktop>();
-    let window = focused(app);
-    match id {
-        "window" => {
-            let _ = new_window(app);
-        }
-        "reload" => {
-            if let Some(window) = window {
-                let _ = window.eval("location.reload()");
-            }
-        }
-        "help:install" => {
-            let _ = app.opener().open_url(engine::INSTALL_URL, None::<&str>);
-        }
-        "help:docs" => {
-            let _ = app.opener().open_url(
-                "https://github.com/grafenodb/grafeno/blob/main/docs/query-language.md",
-                None::<&str>,
-            );
-        }
-        "help:repo" => {
-            let _ = app
-                .opener()
-                .open_url("https://github.com/grafenodb/grafeno", None::<&str>);
-        }
-        recent if recent.starts_with("recent:") => {
-            let index: usize = recent["recent:".len()..].parse().unwrap_or(usize::MAX);
-            let path = desktop
-                .recent
-                .lock()
-                .expect("not poisoned")
-                .get(index)
-                .cloned();
-            if let (Some(path), Some(window)) = (path, window) {
-                let _ = window.emit_to(window.label(), "open-path", path.display().to_string());
-            }
-        }
-        other => {
-            if let Some(window) = window {
-                let _ = window.emit_to(window.label(), "menu", other.to_owned());
-            }
-        }
-    }
-}
-
 /// A database file given on the command line (or by a second launch).
 fn path_argument(args: &[String]) -> Option<String> {
     args.iter()
@@ -584,8 +428,6 @@ fn main() {
                 .map_err(|error| format!("cannot locate the client data directory: {error}"))?
                 .join("client.sqlite3");
             handle.state::<LocalStore>().initialize(&client_database)?;
-            rebuild_menu(&handle)?;
-            handle.on_menu_event(|app, event| on_menu(app, event.id().as_ref()));
             let args: Vec<String> = std::env::args().collect();
             if let Some(path) = path_argument(&args) {
                 // The Studio asks for its window's session when it starts.

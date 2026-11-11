@@ -16,7 +16,7 @@ import {
 import { tags } from "@lezer/highlight";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 
-import { gqCompletion, gqLanguage } from "../gq.ts";
+import { type GqCompletionSchema, gqCompletion, gqLanguage } from "../gq.ts";
 
 const highlight = HighlightStyle.define([
   { tag: tags.keyword, color: "var(--syntax-keyword)", fontWeight: "600" },
@@ -92,7 +92,7 @@ interface Props {
   value: string;
   onChange: (value: string) => void;
   onRun: (all: boolean) => void;
-  schema: () => { labels: string[]; edgeLabels: string[] };
+  schema: () => GqCompletionSchema;
 }
 
 export const CodeEditor = forwardRef<CodeEditorHandle, Props>(function CodeEditor({ value, onChange, onRun, schema }, ref) {
@@ -129,7 +129,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, Props>(function CodeEdito
           syntaxHighlighting(highlight),
           theme,
           marks,
-          placeholder("// Write GQ statements, each ending with ;\nMATCH (n) RETURN n LIMIT 25;"),
+          placeholder("Write a GQ statement…"),
           keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...completionKeymap, indentWithTab]),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) latest.current.onChange(update.state.doc.toString());

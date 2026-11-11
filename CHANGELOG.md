@@ -11,6 +11,17 @@ Each version says which engines it works with. It speaks to engines only
 through their HTTP API, checks each one on connecting (`GET /v1/about`),
 and hides what an engine lacks.
 
+## Unreleased
+
+- **Unified application chrome**: Windows and Linux no longer add a native
+  File/Edit/View menu above the shared Studio interface.
+- **Stable script workspaces**: script tabs keep their explicit order and
+  scroll horizontally; each script retains its own output while switching
+  scripts or Studio views, and Messages remains selected when requested.
+- **Focused query editing**: new libraries start with an empty `Script 1`,
+  chart controls stay separate from their plot, and completion now covers
+  namespace properties, dotted functions, procedures and engine algorithms.
+
 ## 0.2.1 (2026-11-08)
 
 This release introduces the redesigned Grafeno Studio workspace across Web,

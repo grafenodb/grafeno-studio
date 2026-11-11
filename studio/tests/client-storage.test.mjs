@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { legacyScripts, ownerKey } from "../src/client-storage.ts";
+import { legacyScripts, orderStoredScripts, ownerKey } from "../src/client-storage.ts";
+
+const script = (id, createdAt) => ({
+  owner: "owner", id, name: id, text: "", namespace: null, createdAt, updatedAt: createdAt, lastOpenedAt: createdAt,
+});
 
 test("local data is scoped by endpoint and account without using credentials", () => {
   const first = ownerKey({ url: "HTTPS://DB.EXAMPLE/", token: "secret", user: "Ana" });
@@ -34,4 +38,10 @@ test("legacy localStorage scripts migrate with their active tab", () => {
 test("invalid legacy data is ignored", () => {
   assert.deepEqual(legacyScripts("not json", "owner", 100), { scripts: [], active: null });
   assert.deepEqual(legacyScripts(JSON.stringify({ scripts: [{ id: 4, name: "bad", text: "" }] }), "owner", 100), { scripts: [], active: null });
+});
+
+test("script tabs restore their explicit order instead of recent-use order", () => {
+  const scripts = [script("three", 30), script("one", 10), script("two", 20)];
+  assert.deepEqual(orderStoredScripts(scripts, JSON.stringify(["two", "three", "one"])).map(({ id }) => id), ["two", "three", "one"]);
+  assert.deepEqual(orderStoredScripts(scripts, null).map(({ id }) => id), ["one", "two", "three"]);
 });

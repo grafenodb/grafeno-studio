@@ -2977,6 +2977,8 @@ button.schema-item {
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  touch-action: pan-x;
   flex: none;
 }
 
@@ -3124,15 +3126,31 @@ button.schema-item {
 .result-tabs {
   position: relative;
   z-index: 5;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   padding: 6px 10px;
   border-bottom: 1px solid var(--border);
   background: var(--panel-solid);
+  flex: none;
+}
+
+.result-tab-list,
+.result-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
   overflow-x: auto;
   overflow-y: hidden;
-  flex: none;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+}
+
+.result-tab-list > *,
+.result-actions > * {
+  flex: 0 0 auto;
 }
 
 .result-tab {
@@ -3725,9 +3743,8 @@ td .badge {
 }
 
 .chart-controls {
-  position: sticky;
-  z-index: 4;
-  top: 0;
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -3736,6 +3753,18 @@ td .badge {
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   background: var(--panel-solid);
+  flex: none;
+}
+
+@media (max-width: 900px) {
+  .result-tabs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .result-actions {
+    padding-top: 5px;
+    border-top: 1px solid var(--border);
+  }
 }
 
 .series-chip {

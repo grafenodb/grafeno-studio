@@ -17,7 +17,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewWindow, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State, Theme, WebviewWindow, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
@@ -149,7 +149,6 @@ fn open_path(app: &AppHandle, label: &str, path: PathBuf) -> Result<SessionInfo,
     save_recent(app, &recent);
     drop(recent);
     set_title(app, label, &format!("{} — Grafeno", file_name(&path)));
-    let _ = rebuild_menu(app);
     Ok(reply)
 }
 
@@ -164,9 +163,14 @@ fn new_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     .title("Grafeno")
     .inner_size(1280.0, 840.0)
     .min_inner_size(900.0, 600.0)
-    .background_color(tauri::window::Color(5, 7, 10, 255))
+    .background_color(tauri::window::Color(244, 247, 245, 255))
     .disable_drag_drop_handler()
     .build()
+    .inspect(|window| {
+        // Studio owns its complete toolbar. Keep the native File/Edit/View
+        // menu out of every Windows and Linux window.
+        let _ = window.remove_menu();
+    })
 }
 
 /// The window menus and second launches act on: the focused one.
@@ -254,7 +258,18 @@ fn forget_recent(app: AppHandle, desktop: State<'_, Desktop>, path: String) {
     recent.retain(|other| other != Path::new(&path));
     save_recent(&app, &recent);
     drop(recent);
-    let _ = rebuild_menu(&app);
+}
+
+/// Keeps the native title bar aligned with the theme chosen in Studio.
+#[tauri::command]
+fn set_window_theme(window: WebviewWindow, theme: String) -> Result<(), String> {
+    let theme = match theme.as_str() {
+        "light" => Some(Theme::Light),
+        "dark" => Some(Theme::Dark),
+        "system" => None,
+        _ => return Err(format!("unknown window theme: {theme}")),
+    };
+    window.set_theme(theme).map_err(|error| error.to_string())
 }
 
 /// Asks for a database file: an existing one, or where to create a new one.
@@ -419,6 +434,9 @@ fn main() {
         .manage(Desktop::default())
         .manage(LocalStore::default())
         .setup(|app| {
+            // Tauri may provide a platform menu by default. Grafeno Studio
+            // uses its own toolbar, so remove it before the first window is shown.
+            let _ = app.remove_menu();
             let handle = app.handle().clone();
             let desktop = handle.state::<Desktop>();
             *desktop.recent.lock().expect("not poisoned") = load_recent(&handle);
@@ -465,6 +483,7 @@ fn main() {
             open_external,
             write_bytes,
             restore_database,
+            set_window_theme,
             request,
             local_store::local_scripts,
             local_store::local_put_script,

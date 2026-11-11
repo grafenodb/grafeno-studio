@@ -481,6 +481,7 @@ export function App() {
     // Light is the default look; "system" follows the system's choice.
     document.documentElement.dataset.theme = theme;
     writeSetting("grafeno.studio.theme", theme);
+    if (isDesktop) void desktop.setTheme(theme).catch(() => undefined);
   }, [theme]);
 
   useEffect(() => {

@@ -137,7 +137,7 @@ function download(name: string, text: string, type: string): void {
 }
 
 export function ScriptsView() {
-  const { client, connection, namespace, schema, supports, changed, confirm, toast } = useStudio();
+  const { client, connection, namespace, schema, revision, supports, changed, confirm, toast } = useStudio();
   const [library, setLibrary] = useState<Library>(() => {
     const script = createScript("", "Script 1", "", null);
     return { scripts: [script], active: script.id };
@@ -303,7 +303,7 @@ export function ScriptsView() {
       setProperties([...found].sort((left, right) => left.localeCompare(right)));
     });
     return () => { alive = false; };
-  }, [client, namespace]);
+  }, [client, namespace, revision]);
 
   const labels = useMemo(
     () => ({ labels: Object.keys(schema.labels), edgeLabels: Object.keys(schema.edgeLabels), properties, algorithms }),
@@ -688,18 +688,19 @@ export function ScriptsView() {
 
         <div className="results">
           <div className="result-tabs">
-            <button className={tab === "messages" ? "result-tab active" : "result-tab"} onClick={() => setTab("messages")}>
-              Messages
-              {runs.some((run) => run.status === "error") && <span className="badge danger">!</span>}
-            </button>
-            {tables.map(({ run, index }, position) => (
-              <button key={index} className={tab === index ? "result-tab active" : "result-tab"} onClick={() => { setTab(index); if (run.result?.trace && run.result.columns.length === 0) setMode("trace"); }}>
-                Result {position + 1} <span className="badge">{run.result!.trace ? `${run.result!.trace!.events.length} steps` : run.result!.rows.length}</span>
+            <div className="result-tab-list" role="tablist" aria-label="Script output">
+              <button className={tab === "messages" ? "result-tab active" : "result-tab"} onClick={() => setTab("messages")}>
+                Messages
+                {runs.some((run) => run.status === "error") && <span className="badge danger">!</span>}
               </button>
-            ))}
-            <div className="spacer" />
+              {tables.map(({ run, index }, position) => (
+                <button key={index} className={tab === index ? "result-tab active" : "result-tab"} onClick={() => { setTab(index); if (run.result?.trace && run.result.columns.length === 0) setMode("trace"); }}>
+                  Result {position + 1} <span className="badge">{run.result!.trace ? `${run.result!.trace!.events.length} steps` : run.result!.rows.length}</span>
+                </button>
+              ))}
+            </div>
             {current && (
-              <>
+              <div className="result-actions" aria-label="Result view and export options">
                 <div className="segmented">
                   <button className={mode === "table" ? "active" : ""} onClick={() => setMode("table")}>
                     <Icon name="table" size={14} /> Table
@@ -739,7 +740,7 @@ export function ScriptsView() {
                 <button className="ghost small-button" onClick={() => download(`${active.name}.json`, JSON.stringify(current, null, 2), "application/json")}>
                   <Icon name="download" size={14} /> JSON
                 </button>
-              </>
+              </div>
             )}
           </div>
           <div className="result-body">

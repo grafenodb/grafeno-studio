@@ -79,6 +79,8 @@ export const desktop = {
   engine: () => invoke<EngineInfo | null>("engine_info"),
   /** Another window, with its own connection. */
   newWindow: () => invoke<void>("open_window"),
+  /** Match the native title bar to Studio's selected theme. */
+  setTheme: (theme: "system" | "light" | "dark") => invoke<void>("set_window_theme", { theme }),
   open: (path: string) => invoke<DesktopSession>("open_database", { path }),
   close: () => invoke<void>("close_database"),
   recent: () => invoke<RecentDatabase[]>("recent"),

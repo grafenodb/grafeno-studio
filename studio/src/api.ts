@@ -3,7 +3,7 @@
 import { type About, Grafeno, GrafenoError, type Node } from "../../client/src/index.ts";
 import { desktopFetch, isDesktop } from "./desktop.ts";
 
-export type { AlgorithmInfo, Edge, NamespaceInfo, Node, NodeWithText, QueryResult } from "../../client/src/index.ts";
+export type { AlgorithmInfo, Edge, NamespaceInfo, Node, NodeWithText, QueryResult, Trace, Transaction } from "../../client/src/index.ts";
 export { Grafeno, GrafenoError };
 
 export interface Connection {

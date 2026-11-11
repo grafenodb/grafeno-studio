@@ -10,7 +10,8 @@ export const KEYWORDS = [
   "OR", "XOR", "NOT", "IN", "IS", "NULL", "TRUE", "FALSE", "STARTS", "ENDS", "CONTAINS",
   "MERGE", "ON", "UNWIND", "UNION", "ALL", "CALL", "YIELD", "FOREACH", "CASE", "WHEN", "THEN",
   "ELSE", "END", "EXISTS", "EXPLAIN", "PROFILE", "INDEX", "INDEXES", "CONSTRAINT", "CONSTRAINTS",
-  "DROP", "SHOW", "FOR", "REQUIRE", "UNIQUE", "IF",
+  "DROP", "SHOW", "FOR", "REQUIRE", "UNIQUE", "IF", "NAMESPACE", "COMMENT", "BEGIN", "COMMIT", "ROLLBACK",
+  "READ", "ONLY", "FULLTEXT", "VECTOR", "EACH", "OPTIONS", "TYPED", "TRACE",
 ];
 
 export const FUNCTIONS = [
@@ -32,7 +33,11 @@ export const PSEUDO_PROPERTIES = [
 
 const PROCEDURES = [
   { label: "db.labels", detail: "List node labels and counts" },
-  { label: "db.search", detail: "Full-text search" },
+  { label: "db.search", detail: "Full-text or hybrid search" },
+  { label: "db.searchIndex", detail: "Search a named full-text index" },
+  { label: "db.searchVector", detail: "Search a vector or named vector index" },
+  { label: "db.searchVectors", detail: "Search several vectors" },
+  { label: "db.similar", detail: "Find nodes similar to a node" },
   { label: "temporal.series", detail: "Generate a temporal series" },
 ];
 

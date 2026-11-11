@@ -120,7 +120,7 @@ export function LabelInput({
   );
 }
 
-export type PropType = "text" | "number" | "boolean" | "json";
+export type PropType = "text" | "number" | "boolean" | "null" | "json";
 
 export interface PropRow {
   key: string;
@@ -130,6 +130,7 @@ export interface PropRow {
 
 export function rowsFromProps(props: Record<string, unknown>): PropRow[] {
   return Object.entries(props).map(([key, value]) => {
+    if (value === null) return { key, type: "null", value: "" };
     if (typeof value === "string") return { key, type: "text", value };
     if (typeof value === "number") return { key, type: "number", value: String(value) };
     if (typeof value === "boolean") return { key, type: "boolean", value: String(value) };
@@ -159,6 +160,9 @@ export function propsFromRows(rows: PropRow[]): Record<string, unknown> {
       }
       case "boolean":
         props[key] = row.value === "true";
+        break;
+      case "null":
+        props[key] = null;
         break;
       case "json":
         try {
@@ -198,9 +202,12 @@ export function PropsEditor({ rows, onChange }: { rows: PropRow[]; onChange: (ro
             <option value="text">text</option>
             <option value="number">number</option>
             <option value="boolean">yes/no</option>
+            <option value="null">null</option>
             <option value="json">JSON</option>
           </select>
-          {row.type === "boolean" ? (
+          {row.type === "null" ? (
+            <div className="prop-null muted mono" aria-label="Value">null</div>
+          ) : row.type === "boolean" ? (
             <select value={row.value} onChange={(event) => update(index, { value: event.target.value })} aria-label="Value">
               <option value="true">true</option>
               <option value="false">false</option>

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 
-import { type AlgorithmInfo, type QueryResult, describeError, go, labelColor } from "../api.ts";
+import { type AlgorithmInfo, type QueryResult, type Transaction, describeError, go, labelColor } from "../api.ts";
 import { ACTIVE_SCRIPT, clientStorage, migrateLegacyScripts, orderStoredScripts, requestPersistentBrowserStorage, resolveOwner, type StoredScript } from "../client-storage.ts";
 import { Chart, canChart } from "../components/Chart.tsx";
 import { type CodeEditorHandle, CodeEditor } from "../components/CodeEditor.tsx";
 import { JsonTree } from "../components/JsonTree.tsx";
 import { MiniGraph, hasGraph } from "../components/MiniGraph.tsx";
 import { ResultTable } from "../components/ResultTable.tsx";
+import { TraceViewer } from "../components/TraceViewer.tsx";
 import { useStudio } from "../context.ts";
 import { saveText } from "../desktop.ts";
 import { PSEUDO_PROPERTIES, type Statement, errorPosition, splitStatements, statementAt } from "../gq.ts";
@@ -25,12 +26,17 @@ interface Run {
   /** Where the error is in the script (1-based). */
   at?: { line: number; column: number };
   ms: number;
+  message?: string;
+}
+
+function canRecordTrace(source: string) {
+  return /^(?:MATCH\b|OPTIONAL\s+MATCH\b|CREATE\s*\(|MERGE\b|UNWIND\b|CALL\b|RETURN\b|WITH\b)/i.test(source);
 }
 
 interface ScriptOutput {
   runs: Run[];
   tab: "messages" | number;
-  mode: "table" | "json" | "graph" | "chart" | "profile";
+  mode: "table" | "json" | "graph" | "chart" | "profile" | "trace";
 }
 
 const EMPTY_OUTPUT: ScriptOutput = { runs: [], tab: "messages", mode: "table" };
@@ -71,12 +77,19 @@ const SNIPPETS: { name: string; text: string }[] = [
   { name: "Classify (CASE)", text: "MATCH (p:Person)\nRETURN p.name,\n  CASE WHEN p.age < 30 THEN 'young' ELSE 'experienced' END AS band;" },
   { name: "Labels (CALL)", text: "CALL db.labels() YIELD label, count\nRETURN label, count ORDER BY count DESC;" },
   { name: "Full-text search (CALL)", text: "CALL db.search('rust', 10) YIELD node, score\nRETURN node, score;" },
+  { name: "Search a full-text index", text: "CALL db.searchIndex('notes', '\"graph memory\" +agent -draft', {limit: 10, fragments: true})\nYIELD node, score, fragments\nRETURN node, score, fragments;" },
+  { name: "Similar nodes", text: "MATCH (n:Doc {title: 'Graphs'})\nCALL db.similar(n, {index: 'docs', limit: 5}) YIELD node, score\nRETURN node, score;" },
   { name: "Statistics", text: "MATCH (p:Person)\nRETURN count(p), avg(p.age), stdev(p.age), median(p.age),\n  percentileCont(p.age, 0.9) AS p90, min(p.age), max(p.age);" },
   { name: "Group by month", text: "MATCH (n:Note)\nWITH date.truncate('month', n.@created_at) AS month, count(*) AS notes\nRETURN date(month) AS month, notes ORDER BY month;" },
   { name: "How long facts held", text: "MATCH (p)-[r:works_at]->(c)\nRETURN p.name, c.name,\n  duration.between(r.@valid_from, coalesce(r.@valid_to, datetime())) AS held;" },
   { name: "Valid at each month", text: "CALL temporal.series('2024-01-01', '2024-12-01', 'P1M') YIELD at\nOPTIONAL MATCH (p)-[r:works_at]->(c) VALID AT at\nRETURN date(at) AS month, count(r) AS facts ORDER BY month;" },
   { name: "Create an index", text: "CREATE INDEX FOR (p:Person) ON (p.age);\n\nSHOW INDEXES;" },
+  { name: "Composite index", text: "CREATE INDEX person_name FOR (p:Person) ON (p.last, p.first);" },
+  { name: "Full-text index", text: "CREATE FULLTEXT INDEX notes FOR (n:Note) ON EACH [n.title, n.body]\nOPTIONS {analyzer: 'english', weights: {title: 3}};" },
+  { name: "Vector index", text: "CREATE VECTOR INDEX docs FOR (d:Doc) ON (d.embedding)\nOPTIONS {dimension: 768, similarity: 'cosine', m: 16, ef_search: 64};" },
   { name: "Unique constraint", text: "CREATE CONSTRAINT FOR (p:Person) REQUIRE p.email IS UNIQUE;" },
+  { name: "Required property", text: "CREATE CONSTRAINT person_name FOR (p:Person) REQUIRE p.name IS NOT NULL;" },
+  { name: "Explicit transaction", text: "BEGIN;\nCREATE (:Note {title: 'Atomic change'});\nCREATE (:Tag {name: 'transaction'});\nCOMMIT;" },
   { name: "Query plan (EXPLAIN)", text: "EXPLAIN MATCH (p:Person)-[:works_at]->(c)\nRETURN p.name, c.name;" },
   { name: "Cost per step (PROFILE)", text: "PROFILE MATCH (p:Person)-[:works_at]->(c)\nRETURN c.name, count(p);" },
 ];
@@ -124,7 +137,7 @@ function download(name: string, text: string, type: string): void {
 }
 
 export function ScriptsView() {
-  const { client, connection, namespace, schema, changed, confirm, toast } = useStudio();
+  const { client, connection, namespace, schema, supports, changed, confirm, toast } = useStudio();
   const [library, setLibrary] = useState<Library>(() => {
     const script = createScript("", "Script 1", "", null);
     return { scripts: [script], active: script.id };
@@ -135,6 +148,7 @@ export function ScriptsView() {
   const [outputs, setOutputs] = useState<Record<string, ScriptOutput>>({});
   const [running, setRunning] = useState(false);
   const [stopOnError, setStopOnError] = useState(true);
+  const [recordTrace, setRecordTrace] = useState(false);
   const [algorithms, setAlgorithms] = useState<AlgorithmInfo[]>([]);
   const [properties, setProperties] = useState<string[]>([]);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -324,13 +338,38 @@ export function ScriptsView() {
       const graph = client.namespace(namespace);
       const done: Run[] = [];
       let wrote = false;
+      let transaction: Transaction | null = null;
       patchOutput(scriptId, { runs: [] });
       for (const statement of statements) {
         if (stop.current) break;
         editor.current?.mark({ running: [statement.from, statement.to] });
         const started = performance.now();
         try {
-          const result = await graph.query(statement.text.replace(/;\s*$/, ""));
+          const source = statement.text.replace(/;\s*$/, "").trim();
+          const command = source.toUpperCase().replace(/\s+/g, " ");
+          if (command === "BEGIN" || command === "BEGIN READ ONLY") {
+            if (transaction) throw new Error("A transaction is already open in this run.");
+            transaction = await graph.begin({ readOnly: command.endsWith("READ ONLY") });
+            done.push({ statement, status: "ok", message: command.endsWith("READ ONLY") ? "Read-only transaction started" : "Transaction started", ms: performance.now() - started });
+            patchOutput(scriptId, { runs: [...done] });
+            continue;
+          }
+          if (command === "COMMIT" || command === "ROLLBACK") {
+            if (!transaction) throw new Error(`${command} needs an open transaction in this run.`);
+            if (command === "COMMIT") await transaction.commit();
+            else await transaction.rollback();
+            transaction = null;
+            done.push({ statement, status: "ok", message: command === "COMMIT" ? "Transaction committed" : "Transaction rolled back", ms: performance.now() - started });
+            patchOutput(scriptId, { runs: [...done] });
+            continue;
+          }
+          const alreadyTraced = /^TRACE\b/i.test(source);
+          const traceRequested = recordTrace && !alreadyTraced && canRecordTrace(source);
+          const result = transaction
+            ? await transaction.query(traceRequested ? `TRACE ${source}` : source)
+            : traceRequested
+              ? await graph.query(source, {}, { trace: true })
+              : await graph.query(source);
           done.push({ statement, status: "ok", result, ms: performance.now() - started });
           if (changes(result.stats)) wrote = true;
         } catch (problem) {
@@ -350,6 +389,12 @@ export function ScriptsView() {
         }
         patchOutput(scriptId, { runs: [...done] });
       }
+      if (transaction) {
+        await transaction.rollback().catch(() => undefined);
+        const statement = done.at(-1)?.statement ?? statements[0];
+        done.push({ statement, status: "error", error: "Open transaction rolled back because the run ended without COMMIT.", ms: 0 });
+        patchOutput(scriptId, { runs: [...done] });
+      }
       const failed = done.find((run) => run.status === "error");
       editor.current?.mark(failed ? { error: failed.at?.line ?? failed.statement.line } : null);
       if (failed?.at) editor.current?.goto(failed.at.line, failed.at.column);
@@ -359,7 +404,7 @@ export function ScriptsView() {
       if (wrote) changed();
       setRunning(false);
     },
-    [running, active.id, active.text, tab, client, namespace, stopOnError, changed, toast, patchOutput],
+    [running, active.id, active.text, tab, client, namespace, stopOnError, recordTrace, changed, toast, patchOutput],
   );
 
   useEffect(() => {
@@ -421,7 +466,7 @@ export function ScriptsView() {
     window.addEventListener("pointerup", up);
   };
 
-  const tables = runs.map((run, index) => ({ run, index })).filter(({ run }) => (run.result?.columns.length ?? 0) > 0);
+  const tables = runs.map((run, index) => ({ run, index })).filter(({ run }) => (run.result?.columns.length ?? 0) > 0 || Boolean(run.result?.trace));
   const current = typeof tab === "number" ? runs[tab]?.result : undefined;
   const total = runs.reduce((sum, run) => sum + run.ms, 0);
   const openNode = useCallback((id: string) => go("explorer", id), []);
@@ -588,6 +633,11 @@ export function ScriptsView() {
           <label className="check small">
             <input type="checkbox" checked={stopOnError} onChange={(event) => setStopOnError(event.target.checked)} /> Stop on error
           </label>
+          {supports("query.trace") && (
+            <label className="check small" title="Record the nodes and facts visited so the walk can be replayed">
+              <input type="checkbox" checked={recordTrace} onChange={(event) => setRecordTrace(event.target.checked)} /> Record walk
+            </label>
+          )}
           <span className={`local-save-state ${saveState}`} title="Scripts are stored only on this computer">
             <Icon name={saveState === "error" ? "x" : saveState === "saving" || saveState === "loading" ? "clock" : "check"} size={13} />
             {saveState === "loading" ? "Loading library…" : saveState === "saving" ? "Saving…" : saveState === "error" ? "Local save unavailable" : "Saved locally"}
@@ -643,8 +693,8 @@ export function ScriptsView() {
               {runs.some((run) => run.status === "error") && <span className="badge danger">!</span>}
             </button>
             {tables.map(({ run, index }, position) => (
-              <button key={index} className={tab === index ? "result-tab active" : "result-tab"} onClick={() => setTab(index)}>
-                Result {position + 1} <span className="badge">{run.result!.rows.length}</span>
+              <button key={index} className={tab === index ? "result-tab active" : "result-tab"} onClick={() => { setTab(index); if (run.result?.trace && run.result.columns.length === 0) setMode("trace"); }}>
+                Result {position + 1} <span className="badge">{run.result!.trace ? `${run.result!.trace!.events.length} steps` : run.result!.rows.length}</span>
               </button>
             ))}
             <div className="spacer" />
@@ -666,6 +716,11 @@ export function ScriptsView() {
                   {current.profile && (
                     <button className={mode === "profile" ? "active" : ""} onClick={() => setMode("profile")}>
                       <Icon name="clock" size={14} /> Profile
+                    </button>
+                  )}
+                  {current.trace && (
+                    <button className={mode === "trace" ? "active" : ""} onClick={() => setMode("trace") }>
+                      <Icon name="playAll" size={14} /> Walk
                     </button>
                   )}
                 </div>
@@ -708,7 +763,7 @@ export function ScriptsView() {
                       <span className="grow-text">
                         {run.status === "error"
                           ? run.error
-                          : [run.result!.columns.length ? `${run.result!.rows.length} rows` : "", changes(run.result!.stats)].filter(Boolean).join(" · ") || "Done"}
+                          : run.message ?? (run.result ? [run.result.columns.length ? `${run.result.rows.length} rows` : "", run.result.trace ? `${run.result.trace.events.length} traversal events` : "", changes(run.result.stats)].filter(Boolean).join(" · ") || "Done" : "Done")}
                       </span>
                       <span className="muted small mono">{run.ms.toFixed(0)} ms</span>
                     </button>
@@ -721,7 +776,9 @@ export function ScriptsView() {
                 </div>
               )
             ) : current ? (
-              mode === "chart" && canChart(current.columns, current.rows) ? (
+              mode === "trace" && current.trace ? (
+                <TraceViewer trace={current.trace} />
+              ) : mode === "chart" && canChart(current.columns, current.rows) ? (
                 <Chart key={`${tab}-${current.columns.join(",")}`} columns={current.columns} rows={current.rows} />
               ) : mode === "profile" && current.profile ? (
                 <ResultTable

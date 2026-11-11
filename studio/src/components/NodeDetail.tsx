@@ -65,9 +65,8 @@ export function NodeDetail({ id, onChanged, compact }: { id: string; onChanged?:
     });
 
   const patchProps = (props: Record<string, unknown>) => {
-    // Keys that are gone are removed with `null`.
-    for (const key of Object.keys(node.props)) if (!(key in props)) props[key] = null;
-    return graph.patchNode(id, { props });
+    const remove_props = Object.keys(node.props).filter((key) => !(key in props));
+    return graph.patchNode(id, { props, remove_props });
   };
 
   const remove = async () => {

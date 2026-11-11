@@ -17,6 +17,7 @@ const SIZE_EXPANDED = 13;
 const COLOR_BY = {
   label: { title: "Label" },
   louvain: { title: "Community (Louvain)", settings: {} },
+  leiden: { title: "Community (Leiden)", settings: {} },
   labelPropagation: { title: "Community (label propagation)", settings: {} },
   wcc: { title: "Connected component", settings: {} },
 } as const;
@@ -27,6 +28,10 @@ const SIZE_BY = {
   pageRank: { title: "PageRank", settings: { direction: "both" } },
   degree: { title: "Degree", settings: {} },
   betweenness: { title: "Betweenness", settings: { direction: "both", sample: 300 } },
+  kCore: { title: "K-core", settings: {} },
+  eigenvector: { title: "Eigenvector", settings: { direction: "both" } },
+  harmonic: { title: "Harmonic centrality", settings: { direction: "both" } },
+  clustering: { title: "Clustering coefficient", settings: {} },
 } as const;
 
 type ColorBy = keyof typeof COLOR_BY;

@@ -21,6 +21,13 @@ and hides what an engine lacks.
 - **Focused query editing**: new libraries start with an empty `Script 1`,
   chart controls stay separate from their plot, and completion now covers
   namespace properties, dotted functions, procedures and engine algorithms.
+- **Grafeno phase 16**: stored nulls and explicit property removal, explicit
+  transactions in scripts, advanced indexes and constraints, named full-text
+  and vector search, hybrid retrieval and the new analysis algorithms are
+  available from the shared Web and Desktop interface.
+- **Recorded query walks**: engines with `query.trace` can record a script's
+  traversal and replay its anchors, expansions, filters and rows over the
+  graph, entirely in the client.
 
 ## 0.2.1 (2026-11-08)
 

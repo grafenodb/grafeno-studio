@@ -282,8 +282,10 @@ export interface NodeInput {
 
 /** `text` or `embedding` set to `null` removes them. */
 export interface NodePatch {
-  /** Merged into the current properties; `null` values remove properties. */
+  /** Merged into the current properties; a `null` is stored as a value. */
   props?: Props;
+  /** Properties to remove (engines with the `null_values` capability). */
+  remove_props?: string[];
   add_labels?: string[];
   remove_labels?: string[];
   text?: string | null;
@@ -327,6 +329,60 @@ export interface Subgraph {
 export interface Hit {
   node: Id;
   score: number;
+  /** Where a full-text index matched, when asked for. */
+  fragments?: Fragment[];
+}
+
+/** A piece of a property around the words a full-text search matched. */
+export interface Fragment {
+  field: string;
+  text: string;
+  /** The matched words, as `[start, end)` offsets in characters of `text`. */
+  matches: [number, number][];
+}
+
+export interface TextSearchOptions {
+  limit?: number;
+  index?: string;
+  fragments?: boolean;
+}
+
+export type SearchMode = "text" | "vector" | "hybrid";
+
+export interface VectorFilter {
+  labels?: string[];
+  props?: Record<string, unknown>;
+}
+
+export interface VectorSearchOptions {
+  limit?: number;
+  ef?: number;
+  index?: string;
+  filter?: VectorFilter;
+}
+
+export interface SearchInput {
+  text?: string;
+  index?: string;
+  embedding?: number[];
+  vector_index?: string;
+  mode?: SearchMode;
+  fusion?: "rank" | "weighted";
+  k?: number;
+  text_weight?: number;
+  limit?: number;
+  candidates?: number;
+  fragments?: boolean;
+}
+
+export interface SearchHit {
+  node: Id;
+  score: number;
+  text_rank?: number;
+  text_score?: number;
+  vector_rank?: number;
+  similarity?: number;
+  fragments?: Fragment[];
 }
 
 export interface Expansion {
@@ -351,6 +407,12 @@ export interface RecallInput {
   ranking?: boolean | Ranking;
   /** Record an access to each returned node. */
   touch?: boolean;
+  index?: string;
+  vector_index?: string;
+  mode?: SearchMode;
+  fusion?: "rank" | "weighted";
+  k?: number;
+  text_weight?: number;
 }
 
 export interface Ranking {
@@ -496,6 +558,8 @@ export interface AlgorithmOptions {
   write?: string;
   /** With `write`, the column to store (the one after `node` by default). */
   column?: string;
+  /** Statistics instead of result rows. */
+  stats?: boolean;
 }
 
 /** What a writing query changed. */
@@ -528,6 +592,8 @@ export interface QueryResult {
   stats: WriteStats;
   /** What each step did, for statements that start with PROFILE. */
   profile?: PlanStep[];
+  /** How the statement walked the graph, with TRACE or `trace: true`. */
+  trace?: Trace;
   /**
    * On a cluster, a read split across the members: how many parts, and
    * how many ran on the member asked (its own, and those of members that
@@ -740,6 +806,58 @@ export interface GrafenoOptions {
 }
 
 /** Options of one GQ statement. */
+export type TraceEvent = { seq: number; step: number } & (
+  | { kind: "anchor"; node: Id; via: string }
+  | { kind: "expand"; from: Id; to: Id; edge?: Id; edges?: Id[] }
+  | { kind: "keep"; node: Id; edge?: Id }
+  | {
+      kind: "drop";
+      node?: Id;
+      edge?: Id;
+      nodes?: Id[];
+      reason: "pattern" | "edge pattern" | "edge used" | "condition";
+      condition?: string;
+    }
+  | { kind: "row"; index: number; nodes: Id[]; edges: Id[] }
+);
+
+export interface Trace {
+  format: number;
+  steps: { step: number; clause: string }[];
+  events: TraceEvent[];
+  cut: boolean;
+}
+
+export interface EventValues {
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
+  changed?: string[];
+  text?: string;
+  vector?: number[];
+  vector_changed?: boolean;
+  subscriptions: string[];
+}
+
+export interface ChangeEvent {
+  seq: number;
+  op: "created" | "updated" | "deleted";
+  node?: Id;
+  edge?: Id;
+  labels: string[];
+  at: string;
+  by?: string;
+  values?: EventValues;
+  [key: string]: unknown;
+}
+
+export interface EventPage {
+  changes: ChangeEvent[];
+  last: number;
+  oldest: number;
+  gap: boolean;
+  through: number;
+}
+
 export interface QueryOptions {
   /**
    * A write sent again with the same key (a retry after a lost answer)
@@ -753,6 +871,8 @@ export interface QueryOptions {
    * allows, `off` never; `auto` (default) when it is costly enough.
    */
   split?: "auto" | "on" | "off";
+  /** Record how the statement walks the graph. */
+  trace?: boolean;
 }
 
 /** An error returned by the server (or a network failure, with status 0). */
@@ -1240,6 +1360,53 @@ function listQuery(options: ListOptions): string {
   return params.size ? `?${params}` : "";
 }
 
+export interface TransactionInfo {
+  id: string;
+  read_only: boolean;
+  started_at: string;
+  timeout_secs: number;
+  statements: number;
+  failed: string | null;
+}
+
+export interface BeginOptions {
+  readOnly?: boolean;
+  timeoutSecs?: number;
+}
+
+/** An explicit transaction spanning several statements. */
+export class Transaction {
+  readonly #client: Grafeno;
+  readonly #base: string;
+  readonly info: TransactionInfo;
+
+  constructor(client: Grafeno, base: string, info: TransactionInfo) {
+    this.#client = client;
+    this.#base = `${base}/transactions/${encodeURIComponent(info.id)}`;
+    this.info = info;
+  }
+
+  get id(): string {
+    return this.info.id;
+  }
+
+  query(query: string, params: Record<string, unknown> = {}): Promise<QueryResult> {
+    return this.#client.request("POST", `${this.#base}/query`, { query, params });
+  }
+
+  status(): Promise<TransactionInfo> {
+    return this.#client.request("GET", this.#base);
+  }
+
+  async commit(): Promise<void> {
+    await this.#client.request("POST", `${this.#base}/commit`);
+  }
+
+  async rollback(): Promise<void> {
+    await this.#client.request("POST", `${this.#base}/rollback`);
+  }
+}
+
 export class Namespace {
   readonly #client: Grafeno;
   readonly #base: string;
@@ -1391,12 +1558,28 @@ export class Namespace {
 
   // Retrieval
 
-  searchText(query: string, limit = 10): Promise<Hit[]> {
-    return this.#call("POST", "/search/text", { query, limit });
+  /** Text search: node text, or a named full-text index. */
+  searchText(query: string, options: number | TextSearchOptions = 10): Promise<Hit[]> {
+    const { limit = 10, ...rest } = typeof options === "number" ? { limit: options } : options;
+    return this.#call("POST", "/search/text", { query, limit, ...rest });
   }
 
-  searchVector(embedding: number[], limit = 10, ef?: number): Promise<Hit[]> {
-    return this.#call("POST", "/search/vector", { embedding, limit, ef });
+  /** Text, vector or hybrid search. */
+  search(input: SearchInput): Promise<SearchHit[]> {
+    return this.#call("POST", "/search", input);
+  }
+
+  searchVector(embedding: number[], options: number | VectorSearchOptions = 10, ef?: number): Promise<Hit[]> {
+    const rest = typeof options === "number" ? { limit: options, ef } : options;
+    return this.#call("POST", "/search/vector", { embedding, ...rest });
+  }
+
+  searchVectors(embeddings: number[][], options: VectorSearchOptions = {}): Promise<Hit[][]> {
+    return this.#call("POST", "/search/vector", { embeddings, ...options });
+  }
+
+  similar(node: Id, options: VectorSearchOptions = {}): Promise<Hit[]> {
+    return this.#call("POST", "/similar", { node, ...options });
   }
 
   /** Hybrid recall: full text and vectors fused, then graph expansion. */
@@ -1419,7 +1602,9 @@ export class Namespace {
     if (options.idempotencyKey !== undefined) extra["idempotency-key"] = options.idempotencyKey;
     if (options.consistency !== undefined) extra["x-grafeno-consistency"] = options.consistency;
     if (options.split !== undefined) extra["x-grafeno-split"] = options.split;
-    return this.#client.request("POST", this.#base + "/query", { query, params }, extra);
+    const body: Record<string, unknown> = { query, params };
+    if (options.trace) body.trace = true;
+    return this.#client.request("POST", this.#base + "/query", body, extra);
   }
 
   /**
@@ -1430,9 +1615,35 @@ export class Namespace {
     return this.#call("POST", `/algo/${encodeURIComponent(name)}`, options);
   }
 
+  /** Reads one page from a named value-event subscription. */
+  events(name: string, options: { since?: number; limit?: number } = {}): Promise<EventPage> {
+    return this.#call("GET", `/events/${encodeURIComponent(name)}${queryString(options)}`);
+  }
+
   /** Applies every operation in one transaction: all of them or none. */
   batch(ops: BatchOp[]): Promise<BatchResult> {
     return this.#call("POST", "/batch", { ops });
+  }
+
+  /** Begins an explicit transaction (engines with `transactions`). */
+  async begin(options: BeginOptions = {}): Promise<Transaction> {
+    const info = await this.#call<TransactionInfo>("POST", "/transactions", {
+      read_only: options.readOnly ?? false,
+      ...(options.timeoutSecs === undefined ? {} : { timeout_secs: options.timeoutSecs }),
+    });
+    return new Transaction(this.#client, this.#base, info);
+  }
+
+  async transaction<T>(work: (tx: Transaction) => Promise<T>, options: BeginOptions = {}): Promise<T> {
+    const tx = await this.begin(options);
+    try {
+      const value = await work(tx);
+      await tx.commit();
+      return value;
+    } catch (error) {
+      await tx.rollback().catch(() => undefined);
+      throw error;
+    }
   }
 
   // Memory

@@ -28,13 +28,17 @@ done from it, without a terminal:
   and completion (keywords, functions, the namespace's labels,
   pseudo-properties), a schema panel with snippets, Ctrl+Enter to run the
   statement under the cursor or the selection, F5 to run the whole script
-  (each statement in its own transaction, stopping at the first error, whose
+  (ordinary statements run independently; `BEGIN`/`COMMIT` blocks share an
+  explicit transaction, stopping at the first error, whose
   line is marked). Results per statement as a table, JSON, graph, bar or
-  line chart, or the `PROFILE` steps, with CSV and JSON export, and a messages log with times and changes.
+  line chart, the `PROFILE` steps, or a recorded `TRACE` walk with playback,
+  with CSV and JSON export and a messages log with times and changes.
   Tables with more than 300 rows render only their visible rows. A script
   graph draws at most 2,000 result nodes, chosen by degree, and reports the
   full count; larger graphs can be explored incrementally in Graph.
-- **Search**: full text, recall with its signals, context within a token
+- **Search**: node text and named full-text indexes with matching fragments,
+  vector and hybrid search through named indexes, recall with its signals,
+  context within a token
   budget.
 - **Memory**: duplicates to merge, weak memories to archive, groups to
   consolidate.

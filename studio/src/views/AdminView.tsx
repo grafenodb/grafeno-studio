@@ -6,12 +6,25 @@ import { IndexesPanel } from "../components/IndexesPanel.tsx";
 import { KeysPanel } from "../components/KeysPanel.tsx";
 import { useStudio } from "../context.ts";
 import { LOCAL_URL, desktop, isDesktop, saveText } from "../desktop.ts";
-import type { CheckReport, DumpStats, RebuildReport } from "../../../client/src/index.ts";
+import type {
+  CheckReport,
+  DumpStats,
+  InterchangeFormat,
+  InterchangeStats,
+  RebuildReport,
+} from "../../../client/src/index.ts";
 
 /** Saves an export: a save dialog in the desktop app, a download in a browser. */
-function download(name: string, text: string): void {
-  void saveText(name, text, "application/x-ndjson");
+function download(name: string, text: string, type = "application/x-ndjson"): void {
+  void saveText(name, text, type);
 }
+
+/** The formats another graph tool reads and writes, as the engine names them. */
+const FORMATS: { format: InterchangeFormat; label: string; file: string; type: string; accept: string }[] = [
+  { format: "graphml", label: "GraphML", file: "graphml", type: "application/xml", accept: ".graphml,.xml" },
+  { format: "nodes.csv", label: "nodes CSV", file: "nodes.csv", type: "text/csv", accept: ".csv" },
+  { format: "edges.csv", label: "facts CSV", file: "edges.csv", type: "text/csv", accept: ".csv" },
+];
 
 export function AdminView() {
   const { client, connection, namespace, namespaces, setNamespace, changed: refreshNamespaces, confirm, toast, supports } = useStudio();
@@ -19,6 +32,7 @@ export function AdminView() {
   const [check, setCheck] = useState<CheckReport | null>(null);
   const [rebuild, setRebuild] = useState<RebuildReport | null>(null);
   const [imported, setImported] = useState<DumpStats | null>(null);
+  const [interchanged, setInterchanged] = useState<{ label: string; stats: InterchangeStats } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -151,6 +165,62 @@ export function AdminView() {
           </div>
         )}
       </div>
+
+      {supports("import.graphml") && (
+        <div className="panel stack">
+          <h2>GraphML and CSV of “{namespace}”</h2>
+          <p className="muted small" style={{ margin: 0 }}>
+            For other graph tools. CSV headers are typed (<code>name:int</code>, <code>:LABEL</code>); retracted facts are
+            left out. On import, Grafeno ids update their records and other ids become new nodes: import the nodes before the
+            facts between them. Rows that cannot be read are skipped and listed.
+          </p>
+          <div className="row">
+            {FORMATS.map(({ format, label, file, type }) => (
+              <button
+                key={`export-${format}`}
+                disabled={busy !== null}
+                onClick={() =>
+                  void task("export", async () =>
+                    download(`grafeno-${namespace}-${day}.${file}`, await client.exportAs(namespace, format), type),
+                  )
+                }
+              >
+                Export {label}
+              </button>
+            ))}
+          </div>
+          <div className="row">
+            {FORMATS.map(({ format, label, accept }) => (
+              <label className="button" key={`import-${format}`}>
+                Import {label}…
+                <input
+                  type="file"
+                  accept={accept}
+                  hidden
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (!file) return;
+                    void task("import", async () => {
+                      setInterchanged({ label, stats: await client.importAs(namespace, format, await file.text()) });
+                      refreshNamespaces();
+                    });
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+          {interchanged && (
+            <div className="small">
+              <div className={interchanged.stats.failed === 0 ? "ok" : "error"}>
+                Imported {interchanged.stats.nodes} nodes and {interchanged.stats.edges} facts from {interchanged.label}
+                {interchanged.stats.failed > 0 ? `; ${interchanged.stats.failed} could not be read:` : "."}
+              </div>
+              {(interchanged.stats.errors ?? []).length > 0 && <pre>{(interchanged.stats.errors ?? []).join("\n")}</pre>}
+            </div>
+          )}
+        </div>
+      )}
       <div className="panel stack danger-zone">
         <h2>Delete the namespace “{namespace}”</h2>
         <p className="muted small" style={{ margin: 0 }}>

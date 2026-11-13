@@ -13,6 +13,10 @@ and hides what an engine lacks.
 
 ## Unreleased
 
+- **GraphML and CSV**: Administration exports a namespace as GraphML, or as
+  CSV of its nodes or its facts (typed headers), and imports those files,
+  listing the rows it could not read and why. Shown for engines that report
+  `import.graphml`; JSON Lines export and import stay as they were.
 - **Unified application chrome**: Windows and Linux no longer add a native
   File/Edit/View menu above the shared Studio interface.
 - **Stable script workspaces**: script tabs keep their explicit order and

@@ -45,7 +45,8 @@ done from it, without a terminal:
 - **Administration**: who the Studio is connected as and, for owners, the
   access keys (create with grants per namespace, own-records-only and
   owner options; the secret is shown once; revoke); indexes, check,
-  rebuild, export, import, a backup of the whole database file (owners),
+  rebuild, export and import (JSON Lines, and GraphML or CSV for other
+  graph tools), a backup of the whole database file (owners),
   and deleting the namespace with everything in it (after a
   confirmation).
 

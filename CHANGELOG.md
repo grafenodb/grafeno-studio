@@ -11,8 +11,16 @@ Each version says which engines it works with. It speaks to engines only
 through their HTTP API, checks each one on connecting (`GET /v1/about`),
 and hides what an engine lacks.
 
-## Unreleased
+## 0.3.0 (2026-11-13)
 
+The Studio for engine 0.3.0: an agent's palaces seen as the agent reads
+them, GraphML and CSV for other graph tools, and the published TypeScript
+client in place of a copy of it.
+
+- **Works with**: Grafeno engines of HTTP API version 1, from engine 0.1.0,
+  as before. What a version lacks stays hidden: Palaces needs engine 0.3.0
+  (the `tools` capability); GraphML and CSV need an engine that reports
+  `import.graphml`.
 - **The published client**: the Studio calls the engine through
   `@grafenodb/client` 0.2.2 from npm instead of a copy of the client kept
   in this repository, which is removed. With it, a transaction whose

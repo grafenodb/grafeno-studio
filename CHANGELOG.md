@@ -21,6 +21,9 @@ client in place of a copy of it.
   as before. What a version lacks stays hidden: Palaces needs engine 0.3.0
   (the `tools` capability); GraphML and CSV need an engine that reports
   `import.graphml`.
+- **Fixed**: Grafeno Desktop failed to open a database file about one time
+  in 64: the engine took a session token starting with `-` for an option.
+  The token now goes in one argument (`--token=…`).
 - **The published client**: the Studio calls the engine through
   `@grafenodb/client` 0.2.2 from npm instead of a copy of the client kept
   in this repository, which is removed. With it, a transaction whose

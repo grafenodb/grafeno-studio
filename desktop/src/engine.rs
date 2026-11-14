@@ -155,17 +155,17 @@ impl LocalEngine {
     /// waits until it serves. A file another program holds (the Grafeno
     /// service, another window) is refused with a clear message.
     pub fn start(engine: &EngineInfo, path: &Path) -> Result<Self, String> {
-        let token = new_token()?;
+        Self::start_with(engine, path, new_token()?)
+    }
+
+    /// [`LocalEngine::start`] with a given token.
+    fn start_with(engine: &EngineInfo, path: &Path, token: String) -> Result<Self, String> {
         let mut command = Command::new(&engine.path);
         command
-            .args([
-                "serve",
-                "--stop-with-stdin",
-                "--addr",
-                "127.0.0.1:0",
-                "--token",
-                &token,
-            ])
+            .args(["serve", "--stop-with-stdin", "--addr", "127.0.0.1:0"])
+            // One argument: a token may start with `-`, which on its own
+            // would be read as an option (one start in 64 failed so).
+            .arg(format!("--token={token}"))
             .arg("--db")
             .arg(path)
             .stdin(Stdio::piped())
@@ -382,6 +382,17 @@ mod with_the_engine {
             std::env::temp_dir().join(format!("grafeno-desktop-{name}-{}", new_token().unwrap()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn a_token_that_starts_with_a_dash_is_not_taken_for_an_option() {
+        let engine = engine();
+        let dir = temp_dir("dash");
+        let session =
+            LocalEngine::start_with(&engine, &dir.join("memory.redb"), "-dash_token".into())
+                .unwrap();
+        assert_eq!(session.token, "-dash_token");
+        assert_eq!(call(&session, "GET", "/v1/namespaces", "", true).0, 200);
     }
 
     #[test]

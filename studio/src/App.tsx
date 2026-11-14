@@ -29,6 +29,7 @@ import { ExplorerView } from "./views/ExplorerView.tsx";
 import { GraphView } from "./views/GraphView.tsx";
 import { MemoryView } from "./views/MemoryView.tsx";
 import { OverviewView } from "./views/OverviewView.tsx";
+import { PalaceView } from "./views/PalaceView.tsx";
 import { ScriptsView } from "./views/ScriptsView.tsx";
 import { SearchView } from "./views/SearchView.tsx";
 import { StartView } from "./views/StartView.tsx";
@@ -51,6 +52,7 @@ const VIEWS: { id: string; title: string; icon: IconName; hint: string; needs?: 
   { id: "scripts", title: "Scripts", icon: "scripts", hint: "Write and run GQ scripts" },
   { id: "search", title: "Search", icon: "search", hint: "Full text, recall and context" },
   { id: "memory", title: "Memory", icon: "memory", hint: "Duplicates, decay, consolidation", needs: "memory" },
+  { id: "palace", title: "Palaces", icon: "map", hint: "Rooms, walks, routes and reflection", needs: "tools" },
   { id: "admin", title: "Administration", icon: "admin", hint: "Check, rebuild, export, import" },
   { id: "cluster", title: "Cluster", icon: "cluster", hint: "Members, Raft groups, lag, where namespaces live", needs: "cluster" },
   { id: "access", title: "Access", icon: "access", hint: "Users, roles and their privileges", needs: "roles" },
@@ -978,6 +980,7 @@ export function App() {
           )}
           {view === "search" && <SearchView />}
           {view === "memory" && <MemoryView />}
+          {view === "palace" && <PalaceView />}
           {view === "admin" && <AdminView />}
           {view === "cluster" && <ClusterView />}
           {view === "access" && <AccessView />}

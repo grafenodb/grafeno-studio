@@ -42,6 +42,10 @@ done from it, without a terminal:
   budget.
 - **Memory**: duplicates to merge, weak memories to archive, groups to
   consolidate.
+- **Palaces** (engines with the `tools` capability): an agent's palaces,
+  read through the memory tools and writing nothing: rooms and doors, a room
+  entered with its checkpoint, its loci, a reflection, walks, routes along
+  relations, and review proposals.
 - **Administration**: who the Studio is connected as and, for owners, the
   access keys (create with grants per namespace, own-records-only and
   owner options; the secret is shown once; revoke); indexes, check,

@@ -13,6 +13,12 @@ and hides what an engine lacks.
 
 ## Unreleased
 
+- **Palaces**: a view of an agent's palaces, read through the engine's
+  memory tools and writing nothing: rooms and doors, a room entered with
+  its checkpoint, its loci, a reflection on what is known and not known
+  there, walks from a topic with how each memory was found and what
+  supports it, routes along relations, and a palace's review proposals.
+  Shown for engines with the `tools` capability.
 - **GraphML and CSV**: Administration exports a namespace as GraphML, or as
   CSV of its nodes or its facts (typed headers), and imports those files,
   listing the rows it could not read and why. Shown for engines that report

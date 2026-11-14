@@ -127,7 +127,8 @@ HTTPS or localhost) and on a compatible browser and GPU. The worker falls
 back to d3-force automatically when any of those requirements is missing;
 WebGL2 and Canvas have the same fallback behavior described above.
 
-It calls the API through the TypeScript client in `../client`.
+It calls the API through the TypeScript client, `@grafenodb/client` from npm
+([grafenodb/grafeno-sdk](https://github.com/grafenodb/grafeno-sdk/tree/main/typescript)).
 
 This exact `dist/` is also the desktop app's window (`../desktop`). There,
 `src/desktop.ts` sends requests through the app, the start screen opens

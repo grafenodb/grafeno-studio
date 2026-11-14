@@ -12,7 +12,7 @@ import type {
   InterchangeFormat,
   InterchangeStats,
   RebuildReport,
-} from "../../../client/src/index.ts";
+} from "@grafenodb/client";
 
 /** Saves an export: a save dialog in the desktop app, a download in a browser. */
 function download(name: string, text: string, type = "application/x-ndjson"): void {

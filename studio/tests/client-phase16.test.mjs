@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { Grafeno } from "../../client/src/index.ts";
+import { Grafeno } from "@grafenodb/client";
 
 const json = (value, status = 200) => new Response(status === 204 ? null : JSON.stringify(value), {
   status,

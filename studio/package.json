@@ -19,6 +19,7 @@
     "@codemirror/view": "^6.43.15",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@fontsource-variable/space-grotesk": "^5.3.0",
+    "@grafenodb/client": "^0.2.2",
     "@lezer/highlight": "^1.2.5",
     "codemirror": "^6.0.2",
     "d3-force": "^3.0.1",

@@ -13,6 +13,11 @@ and hides what an engine lacks.
 
 ## Unreleased
 
+- **The published client**: the Studio calls the engine through
+  `@grafenodb/client` 0.2.2 from npm instead of a copy of the client kept
+  in this repository, which is removed. With it, a transaction whose
+  commit fails reports that failure as it is, with no rollback tried after
+  it.
 - **Palaces**: a view of an agent's palaces, read through the engine's
   memory tools and writing nothing: rooms and doors, a room entered with
   its checkpoint, its loci, a reflection on what is known and not known

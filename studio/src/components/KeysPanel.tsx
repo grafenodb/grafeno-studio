@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { describeError, formatTime, saveConnection } from "../api.ts";
 import { useStudio } from "../context.ts";
 import { Icon } from "../icons.tsx";
-import type { AccessKey, Grant, Role } from "../../../client/src/index.ts";
+import type { AccessKey, Grant, Role } from "@grafenodb/client";
 
 const ROLES: Role[] = ["read", "write", "admin"];
 

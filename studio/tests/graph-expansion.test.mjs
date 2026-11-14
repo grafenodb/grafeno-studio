@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { GrafenoError } from '../../client/src/index.ts';
+import { GrafenoError } from '@grafenodb/client';
 import { loadExpandedGraph } from '../src/graph/expansion.ts';
 
 const node = id => ({ id, labels: ['Note'], props: {}, sources: [], created_at: 0, updated_at: 0 });

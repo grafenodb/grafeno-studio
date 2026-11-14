@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import type { Edge, Node, Trace, TraceEvent } from "../../../client/src/index.ts";
+import type { Edge, Node, Trace, TraceEvent } from "@grafenodb/client";
 import { go } from "../api.ts";
 import { useStudio } from "../context.ts";
 import { Icon } from "../icons.tsx";

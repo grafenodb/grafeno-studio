@@ -1,9 +1,9 @@
 // The connection to a Grafeno server, and small helpers shared by the views.
 
-import { type About, Grafeno, GrafenoError, type Node } from "../../client/src/index.ts";
+import { type About, Grafeno, GrafenoError, type Node } from "@grafenodb/client";
 import { desktopFetch, isDesktop } from "./desktop.ts";
 
-export type { AlgorithmInfo, Edge, NamespaceInfo, Node, NodeWithText, QueryResult, Trace, Transaction } from "../../client/src/index.ts";
+export type { AlgorithmInfo, Edge, NamespaceInfo, Node, NodeWithText, QueryResult, Trace, Transaction } from "@grafenodb/client";
 export { Grafeno, GrafenoError };
 
 export interface Connection {

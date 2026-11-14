@@ -1,4 +1,4 @@
-import { GrafenoError, type Edge, type EdgeFilter, type Namespace, type Node, type Subgraph } from "../../../client/src/index.ts";
+import { GrafenoError, type Edge, type EdgeFilter, type Namespace, type Node, type Subgraph } from "@grafenodb/client";
 
 export const ROOTS_PER_BATCH = 8;
 const LEGACY_CONCURRENCY = 4;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import type { Account, PrivilegeCatalog, PrivilegeObject, RoleDefinition } from "../../../client/src/index.ts";
+import type { Account, PrivilegeCatalog, PrivilegeObject, RoleDefinition } from "@grafenodb/client";
 import { describeError } from "../api.ts";
 import { useStudio } from "../context.ts";
 

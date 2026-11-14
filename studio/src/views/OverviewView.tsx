@@ -4,7 +4,7 @@ import { describeError, formatTime, go, labelColor } from "../api.ts";
 import { Icon, type IconName } from "../icons.tsx";
 import { InspectorPanel } from "../components/InspectorPanel.tsx";
 import { useStudio } from "../context.ts";
-import type { NamespaceStats } from "../../../client/src/index.ts";
+import type { NamespaceStats } from "@grafenodb/client";
 
 function Bars({ counts }: { counts: Record<string, number> }) {
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);

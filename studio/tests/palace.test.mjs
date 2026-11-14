@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { Grafeno } from "../../client/src/index.ts";
+import { Grafeno } from "@grafenodb/client";
 import { parseSteps } from "../src/palace.ts";
 
 const json = (value, status = 200) =>

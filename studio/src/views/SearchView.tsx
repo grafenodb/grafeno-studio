@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { type Node, describeError, displayName, labelColor } from "../api.ts";
 import { useStudio } from "../context.ts";
-import type { Context, Fragment, Recalled, SearchHit, SearchMode } from "../../../client/src/index.ts";
+import type { Context, Fragment, Recalled, SearchHit, SearchMode } from "@grafenodb/client";
 
 type Mode = SearchMode | "recall" | "context";
 

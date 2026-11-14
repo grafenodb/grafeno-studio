@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { describeError, displayName, formatTime } from "../api.ts";
 import { useStudio } from "../context.ts";
-import { GrafenoError } from "../../../client/src/index.ts";
-import type { Conflict, ConsolidationGroup, Duplicate, MergeRecord, Node, WeakMemory } from "../../../client/src/index.ts";
+import { GrafenoError } from "@grafenodb/client";
+import type { Conflict, ConsolidationGroup, Duplicate, MergeRecord, Node, WeakMemory } from "@grafenodb/client";
 
 function describeConflict(conflict: Conflict): string {
   const show = (value: unknown) => (typeof value === "string" ? value : JSON.stringify(value));

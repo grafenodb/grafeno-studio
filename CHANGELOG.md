@@ -11,10 +11,12 @@ Each version says which engines it works with. It speaks to engines only
 through their HTTP API, checks each one on connecting (`GET /v1/about`),
 and hides what an engine lacks.
 
-## Unreleased
+## 0.4.0 (2026-11-22)
 
 Hyperedges, for engine 0.5.0.
 
+- **Works with**: Grafeno engines of HTTP API version 1, from engine 0.1.0,
+  as before. Hyperedges need engine 0.5.0 (the `hyperedges` capability).
 - **Added**: a Hyperedges view (shown when the engine reports the
   `hyperedges` capability): a namespace's hyperedges by label, each with
   its participants in their roles, properties and time, to end, retract

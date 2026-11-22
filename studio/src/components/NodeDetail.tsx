@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { type Edge, type Node, type NodeWithText, describeError, displayName, formatTime, go } from "../api.ts";
 import { useStudio } from "../context.ts";
+import { NodeHyperedges } from "./Hyperedges.tsx";
 import { Icon } from "../icons.tsx";
 import { LabelChip, LabelInput, PropsEditor, type PropRow, propsFromRows, rowsFromProps, useTask } from "../ui.tsx";
 
@@ -15,7 +16,7 @@ type Editing = null | "props" | "text" | "name";
 
 /** A node with its facts; everything on it can be edited in place. */
 export function NodeDetail({ id, onChanged, compact }: { id: string; onChanged?: () => void; compact?: boolean }) {
-  const { client, namespace, schema, changed, toast, confirm, newEdge, revision } = useStudio();
+  const { client, namespace, schema, changed, toast, confirm, newEdge, revision, supports } = useStudio();
   const graph = client.namespace(namespace);
   const [node, setNode] = useState<NodeWithText | null>(null);
   const [facts, setFacts] = useState<Fact[]>([]);
@@ -72,12 +73,17 @@ export function NodeDetail({ id, onChanged, compact }: { id: string; onChanged?:
   const remove = async () => {
     const ok = await confirm({
       title: `Delete “${displayName(node)}”?`,
-      message: `Its ${facts.length} facts, text and embedding are deleted too. This cannot be undone.`,
+      message: `Its ${facts.length} facts, text and embedding are deleted too${
+        supports("hyperedges") ? ", and it leaves the hyperedges it takes part in (one left with a single node goes)" : ""
+      }. This cannot be undone.`,
       confirm: "Delete node",
       danger: true,
     });
     if (!ok) return;
-    await write(() => graph.deleteNode(id), `Deleted ${displayName(node)}.`);
+    await write(
+      () => (supports("hyperedges") ? graph.deleteNode(id, { hyperedges: "detach" }) : graph.deleteNode(id)),
+      `Deleted ${displayName(node)}.`,
+    );
     go(window.location.hash.startsWith("#/graph") ? "graph" : "explorer");
   };
 
@@ -332,6 +338,8 @@ export function NodeDetail({ id, onChanged, compact }: { id: string; onChanged?:
           })}
         </div>
       </section>
+
+      <NodeHyperedges id={id} onChanged={onChanged} />
     </div>
   );
 }

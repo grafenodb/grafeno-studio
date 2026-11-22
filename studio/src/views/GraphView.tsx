@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { type Edge, type Node, describeError, displayName, formatTime, labelColor } from "../api.ts";
+import type { HyperEdge } from "@grafenodb/client";
+
+import { type Edge, type Node, describeError, displayName, formatTime, go, labelColor } from "../api.ts";
+import { HyperedgeCard, useParticipantNames } from "../components/Hyperedges.tsx";
 import { NodeDetail } from "../components/NodeDetail.tsx";
 import { useStudio } from "../context.ts";
 import { type EdgeInput, GraphEngine, type NodeInput, type Target } from "../graph/engine.ts";
@@ -43,6 +46,13 @@ type Analysis = { values: Map<string, number>; groups: number; max: number };
 type Menu = { x: number; y: number; target: Target; nodes: string[] };
 
 const CLUSTER = "cluster:";
+/** A hyperedge drawn as a small node joined to its participants. */
+const HYPER = "hyperedge:";
+/** Hyperedges read for the nodes drawn, at most. */
+const MAX_HYPEREDGES = 500;
+
+/** Ids that stand for a node of the namespace (not a community or a hyperedge). */
+const isNode = (id: string) => !id.startsWith(CLUSTER) && !id.startsWith(HYPER);
 
 async function analyze(
   graph: ReturnType<ReturnType<typeof useStudio>["client"]["namespace"]>,
@@ -57,7 +67,7 @@ async function analyze(
 }
 
 export function GraphView({ seed }: { seed?: string }) {
-  const { client, namespace, revision, newNode, newEdge, confirm, changed, toast } = useStudio();
+  const { client, namespace, revision, newNode, newEdge, confirm, changed, toast, supports } = useStudio();
   const host = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const minimap = useRef<HTMLCanvasElement>(null);
@@ -86,6 +96,9 @@ export function GraphView({ seed }: { seed?: string }) {
   const [groups, setGroups] = useState<Analysis | null>(null);
   const [scores, setScores] = useState<Analysis | null>(null);
   const [showMap, setShowMap] = useState(true);
+  const [hyperedges, setHyperedges] = useState(new Map<string, HyperEdge>());
+  const [showHyperedges, setShowHyperedges] = useState(true);
+  const hyperedgesOn = supports("hyperedges") && showHyperedges;
   const { busy, run } = useTask();
   const theme = useThemeVersion();
 
@@ -126,7 +139,9 @@ export function GraphView({ seed }: { seed?: string }) {
           setMenu(null);
         },
         open: (id) => {
-          if (id.startsWith(CLUSTER)) {
+          if (id.startsWith(HYPER)) {
+            go("hyperedges", id.slice(HYPER.length));
+          } else if (id.startsWith(CLUSTER)) {
             const group = Number(id.slice(CLUSTER.length));
             latest.current.setCollapsed((current) => new Set([...current].filter((c) => c !== group)));
           } else {
@@ -135,7 +150,7 @@ export function GraphView({ seed }: { seed?: string }) {
         },
         menu: (target, x, y, ids) => setMenu({ target, x, y, nodes: ids }),
         connect: (from, to) => {
-          if (from.startsWith(CLUSTER) || to.startsWith(CLUSTER)) return;
+          if (!isNode(from) || !isNode(to)) return;
           const { nameOf: name } = latest.current;
           latest.current.newEdge({ from: { id: from, name: name(from) }, to: { id: to, name: name(to) } });
         },
@@ -198,6 +213,29 @@ export function GraphView({ seed }: { seed?: string }) {
       });
     return () => controller.abort();
   }, [client, namespace, expanded, validAt, revision]);
+
+  // The hyperedges of the nodes loaded, in one query.
+  useEffect(() => {
+    if (!hyperedgesOn || nodes.size === 0) {
+      setHyperedges(new Map());
+      return;
+    }
+    let current = true;
+    const ids = [...nodes.keys()];
+    client
+      .namespace(namespace)
+      .query(`MATCH (n) WHERE n.@id IN $ids MATCH HYPEREDGE h [(n)] RETURN DISTINCT h LIMIT ${MAX_HYPEREDGES}`, { ids })
+      .then((result) => {
+        if (!current) return;
+        const found = new Map<string, HyperEdge>();
+        for (const row of result.rows as [HyperEdge][]) if (row[0]?.participants) found.set(row[0].id, row[0]);
+        setHyperedges(found);
+      })
+      .catch((problem) => current && setError(describeError(problem)));
+    return () => {
+      current = false;
+    };
+  }, [client, namespace, nodes, hyperedgesOn, revision]);
 
   // Run the chosen algorithms on the whole namespace (again after changes).
   useEffect(() => {
@@ -286,9 +324,22 @@ export function GraphView({ seed }: { seed?: string }) {
       }
     }
     links.push(...merged.values());
+    // Each hyperedge with two visible participants or more: a small node,
+    // and a line to each, named by its role.
+    for (const hyperedge of hyperedges.values()) {
+      const ends = hyperedge.participants
+        .map((participant) => ({ participant, place: nodes.has(participant.node) ? placeOf(participant.node) : null }))
+        .filter((end): end is { participant: (typeof hyperedge.participants)[number]; place: string } => end.place !== null);
+      if (new Set(ends.map((end) => end.place)).size < 2) continue;
+      const id = `${HYPER}${hyperedge.id}`;
+      out.push({ id, name: hyperedge.label, color: cssVar("--accent"), size: 6 });
+      ends.forEach((end, index) => {
+        links.push({ id: `${id}/${index}`, from: id, to: end.place, label: end.participant.role ?? "", ended: hyperedge.valid_to !== null && hyperedge.valid_to <= now });
+      });
+    }
     return { nodes: out, edges: links };
     // The theme changes the series colors, read from CSS.
-  }, [nodes, edges, hidden, collapsed, groups, scores, expanded, labelFilter, edgeFilter, theme]);
+  }, [nodes, edges, hyperedges, hidden, collapsed, groups, scores, expanded, labelFilter, edgeFilter, theme]);
 
   useEffect(() => {
     engine.current?.setData(drawn.nodes, drawn.edges);
@@ -367,7 +418,7 @@ export function GraphView({ seed }: { seed?: string }) {
 
   const hide = (ids: string[]) => {
     rootRequest.current++;
-    setHidden((current) => new Set([...current, ...ids.filter((id) => !id.startsWith(CLUSTER))]));
+    setHidden((current) => new Set([...current, ...ids.filter(isNode)]));
     setSelected([]);
     engine.current?.select([]);
   };
@@ -381,7 +432,7 @@ export function GraphView({ seed }: { seed?: string }) {
   };
 
   const deleteNodes = async (ids: string[]) => {
-    const real = ids.filter((id) => !id.startsWith(CLUSTER));
+    const real = ids.filter(isNode);
     if (real.length === 0) return;
     const ok = await confirm({
       title: real.length === 1 ? `Delete “${nameOf(real[0])}”?` : `Delete ${real.length} nodes?`,
@@ -462,6 +513,9 @@ export function GraphView({ seed }: { seed?: string }) {
     const e = engine.current;
     if (current.target.kind === "node") {
       const id = current.target.id;
+      if (id.startsWith(HYPER)) {
+        return [{ icon: "cluster", label: "Open in Hyperedges", run: () => go("hyperedges", id.slice(HYPER.length)) }];
+      }
       if (id.startsWith(CLUSTER)) {
         const group = Number(id.slice(CLUSTER.length));
         return [{ icon: "expand", label: "Expand the community", run: () => setCollapsed((c) => new Set([...c].filter((g) => g !== group))) }];
@@ -523,11 +577,16 @@ export function GraphView({ seed }: { seed?: string }) {
   }, [menu]);
 
   const edge = selectedEdge ? edges.get(selectedEdge) : undefined;
-  const single = selected.length === 1 && !selected[0].startsWith(CLUSTER) ? selected[0] : null;
+  const single = selected.length === 1 && isNode(selected[0]) ? selected[0] : null;
+  const hyperSelected = selected.length === 1 && selected[0].startsWith(HYPER) ? hyperedges.get(selected[0].slice(HYPER.length)) : undefined;
+  // Participants not drawn are named too.
+  const participantNames = useParticipantNames(hyperSelected ? [hyperSelected] : []);
   const visible = drawn.nodes.length;
+  const drawnHyperedges = drawn.nodes.filter((node) => node.id.startsWith(HYPER)).length;
+  const drawnFacts = drawn.edges.filter((link) => !link.id.startsWith(HYPER)).length;
   const activeFilters = Number(Boolean(labelFilter)) + Number(Boolean(edgeFilter)) + Number(Boolean(validAt));
-  const inspectorTitle = single ? nameOf(single) : edge ? edge.label : `${selected.length} nodes`;
-  const inspectorKind = single ? "Node inspector" : edge ? "Fact inspector" : "Selection";
+  const inspectorTitle = single ? nameOf(single) : hyperSelected ? hyperSelected.label : edge ? edge.label : `${selected.length} nodes`;
+  const inspectorKind = single ? "Node inspector" : hyperSelected ? "Hyperedge" : edge ? "Fact inspector" : "Selection";
 
   return (
     <div className="graph" aria-busy={loading} ref={host} tabIndex={-1} onKeyDown={onKey}>
@@ -573,6 +632,15 @@ export function GraphView({ seed }: { seed?: string }) {
             </select>
           </label>
         </div>
+        {supports("hyperedges") && (
+          <>
+            <span className="toolbar-sep" />
+            <label className="row small nowrap" title="Draw each hyperedge as a small node joined to its participants">
+              <input type="checkbox" checked={showHyperedges} onChange={(event) => setShowHyperedges(event.target.checked)} />
+              Hyperedges
+            </label>
+          </>
+        )}
         <span className="toolbar-sep" />
         <div className="graph-filter-anchor" ref={filterBox}>
           <button className={activeFilters ? "graph-filter-button active" : "graph-filter-button"} onClick={() => setFiltersOpen((value) => !value)} aria-expanded={filtersOpen}>
@@ -633,7 +701,8 @@ export function GraphView({ seed }: { seed?: string }) {
       </div>
 
       <div className="canvas-status small">
-        {visible} nodes · {drawn.edges.length} facts
+        {visible - drawnHyperedges} nodes · {drawnFacts} facts
+        {drawnHyperedges > 0 && ` · ${drawnHyperedges} hyperedge${drawnHyperedges === 1 ? "" : "s"}`}
         {hidden.size > 0 && ` · ${hidden.size} hidden`}
         {labelFilter && ` · label ${labelFilter}`}
         {edgeFilter && ` · fact ${edgeFilter}`}
@@ -726,6 +795,7 @@ export function GraphView({ seed }: { seed?: string }) {
             )}
           </div>
           {single && <NodeDetail key={single} id={single} compact />}
+          {hyperSelected && <HyperedgeCard edge={hyperSelected} names={participantNames} />}
           {selected.length > 1 && (
             <div className="stack tight">
               <p className="muted small">Drag any of them to move them together. Right-click for more.</p>

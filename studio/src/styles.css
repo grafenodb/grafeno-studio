@@ -5799,3 +5799,65 @@ button.primary {
     transition-delay: 0s !important;
   }
 }
+
+/* Hyperedges: one fact, several nodes in their roles. */
+.hyperedge-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hyperedge {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hyperedge:hover {
+  background: var(--hover);
+}
+
+.hyperedge.ended {
+  opacity: 0.55;
+}
+
+.hyperedge-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hyperedge-head .fact-tools {
+  opacity: 0;
+  transition: opacity var(--fast);
+}
+
+.hyperedge:hover .hyperedge-head .fact-tools,
+.hyperedge-head .fact-tools:focus-within {
+  opacity: 1;
+}
+
+.participants {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 10px;
+}
+
+.participants li {
+  display: contents;
+}
+
+.participants .role {
+  font-family: var(--font-mono);
+}
+
+.hex.hyper {
+  background: var(--accent);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}

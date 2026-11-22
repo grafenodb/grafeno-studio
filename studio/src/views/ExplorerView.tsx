@@ -9,7 +9,7 @@ import { Empty, useNodeSearch, useTask } from "../ui.tsx";
 const PAGE = 50;
 
 export function ExplorerView({ selected }: { selected?: string }) {
-  const { client, namespace, schema, revision, changed, newNode, confirm, toast } = useStudio();
+  const { client, namespace, schema, revision, changed, newNode, confirm, toast, supports } = useStudio();
   const [label, setLabel] = useState<string | undefined>(undefined);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [next, setNext] = useState<string | null>(null);
@@ -52,13 +52,16 @@ export function ExplorerView({ selected }: { selected?: string }) {
   const bulkDelete = async () => {
     const ok = await confirm({
       title: `Delete ${checked.size} nodes?`,
-      message: "Their facts, texts and embeddings are deleted too. This cannot be undone.",
+      message: `Their facts, texts and embeddings are deleted too${
+        supports("hyperedges") ? ", and they leave the hyperedges they take part in" : ""
+      }. This cannot be undone.`,
       confirm: "Delete nodes",
       danger: true,
     });
     if (!ok) return;
     await run(async () => {
-      await client.namespace(namespace).batch([...checked].map((id) => ({ op: "delete_node" as const, id })));
+      const hyperedges = supports("hyperedges") ? ("detach" as const) : undefined;
+      await client.namespace(namespace).batch([...checked].map((id) => ({ op: "delete_node" as const, id, ...(hyperedges ? { hyperedges } : {}) })));
       toast(`Deleted ${checked.size} nodes.`, "ok");
       if (selected && checked.has(selected)) go("explorer");
       setChecked(new Set());

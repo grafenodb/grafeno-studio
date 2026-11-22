@@ -11,6 +11,22 @@ Each version says which engines it works with. It speaks to engines only
 through their HTTP API, checks each one on connecting (`GET /v1/about`),
 and hides what an engine lacks.
 
+## Unreleased
+
+Hyperedges, for engine 0.5.0.
+
+- **Added**: a Hyperedges view (shown when the engine reports the
+  `hyperedges` capability): a namespace's hyperedges by label, each with
+  its participants in their roles, properties and time, to end, retract
+  or delete. A node's detail lists the hyperedges it takes part in, and
+  the graph draws each hyperedge between drawn nodes as a small node
+  joined to its participants, each line named by the role (a checkbox
+  turns it off); selecting one shows it in the inspector.
+- **Changed**: deleting nodes on an engine with hyperedges takes them out
+  of the hyperedges they are in (one left with a single node is deleted),
+  instead of failing.
+- **The client**: `@grafenodb/client` 0.3.0.
+
 ## 0.3.0 (2026-11-13)
 
 The Studio for engine 0.3.0: an agent's palaces seen as the agent reads

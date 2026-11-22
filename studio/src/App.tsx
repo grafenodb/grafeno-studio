@@ -27,6 +27,7 @@ import { AccessView } from "./views/AccessView.tsx";
 import { ClusterView } from "./views/ClusterView.tsx";
 import { ExplorerView } from "./views/ExplorerView.tsx";
 import { GraphView } from "./views/GraphView.tsx";
+import { HyperedgesView } from "./views/HyperedgesView.tsx";
 import { MemoryView } from "./views/MemoryView.tsx";
 import { OverviewView } from "./views/OverviewView.tsx";
 import { PalaceView } from "./views/PalaceView.tsx";
@@ -49,6 +50,7 @@ const VIEWS: { id: string; title: string; icon: IconName; hint: string; needs?: 
   { id: "overview", title: "Overview", icon: "overview", hint: "Namespaces and what they hold" },
   { id: "explorer", title: "Explorer", icon: "explorer", hint: "Browse, create and edit nodes" },
   { id: "graph", title: "Graph", icon: "graph", hint: "Draw and connect the graph" },
+  { id: "hyperedges", title: "Hyperedges", icon: "cluster", hint: "Facts that relate several nodes, each in a role", needs: "hyperedges" },
   { id: "scripts", title: "Scripts", icon: "scripts", hint: "Write and run GQ scripts" },
   { id: "search", title: "Search", icon: "search", hint: "Full text, recall and context" },
   { id: "memory", title: "Memory", icon: "memory", hint: "Duplicates, decay, consolidation", needs: "memory" },
@@ -973,6 +975,7 @@ export function App() {
           {view === "overview" && <OverviewView />}
           {view === "explorer" && <ExplorerView selected={route.param} />}
           {view === "graph" && <GraphView seed={route.param} />}
+          {view === "hyperedges" && <HyperedgesView selected={route.param} />}
           {(view === "scripts" || scriptsOpened) && (
             <div className="persistent-scripts" hidden={view !== "scripts"}>
               <ScriptsView />
